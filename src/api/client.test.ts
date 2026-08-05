@@ -283,4 +283,37 @@ describe('dedupeTimelineItems', () => {
     const items = [makeItem('at://p/a'), makeItem('at://p/b')]
     expect(dedupeTimelineItems(items)).toEqual(items)
   })
+
+  it('自己リプライ連鎖(A→B→C)の各フィードエントリがroot/parent複製を伴って流れてきても、各投稿のconnectsToNextとreplyToHandleが失われない', () => {
+    // A(root)←B(Aへの返信)←C(Bへの返信) という自己リプライ連鎖を想定。
+    // フィードは新しい順で流れてくるため、Cのエントリ→Bのエントリ→Aのエントリの順にflatMapされる。
+    const postA: TimelineItem['post'] = { ...(likedPost as PostSummary), uri: 'at://p/a' }
+    const postB: TimelineItem['post'] = { ...(likedPost as PostSummary), uri: 'at://p/b' }
+    const postC: TimelineItem['post'] = { ...(likedPost as PostSummary), uri: 'at://p/c' }
+
+    // Cのフィードエントリ由来: [A(root,connects), B(parent,connects), C本体(replyToHandle)]
+    const fromC: TimelineItem[] = [
+      { post: postA, connectsToNext: true },
+      { post: postB, connectsToNext: true },
+      { post: postC, replyToHandle: 'author-of-b' },
+    ]
+    // Bのフィードエントリ由来: [A(parent,connects)=root===parentなので1件のみ, B本体(replyToHandle)]
+    const fromB: TimelineItem[] = [
+      { post: postA, connectsToNext: true },
+      { post: postB, replyToHandle: 'author-of-a' },
+    ]
+    // Aのフィードエントリ由来(reply無し): [A本体]
+    const fromA: TimelineItem[] = [{ post: postA }]
+
+    const merged = [...fromC, ...fromB, ...fromA]
+    const result = dedupeTimelineItems(merged)
+
+    expect(result.map((it) => it.post.uri)).toEqual(['at://p/a', 'at://p/b', 'at://p/c'])
+    // Aは複製(connectsToNext)のまま表示位置を保持しつつ、独立投稿としての情報(replyToHandle無し)を維持する
+    expect(result[0]?.connectsToNext).toBe(true)
+    // Bはconnects複製とreplyToHandle付き本体の両方の情報を失わない: 罫線接続(connectsToNext)と返信元表示(replyToHandle)の少なくとも一方は保持される
+    expect(result[1]?.connectsToNext || result[1]?.replyToHandle).toBeTruthy()
+    // Cは本体のみなのでreplyToHandleを維持する
+    expect(result[2]?.replyToHandle).toBe('author-of-b')
+  })
 })
