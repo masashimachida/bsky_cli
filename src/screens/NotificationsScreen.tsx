@@ -170,18 +170,20 @@ export function NotificationsScreen({
         const action = confirmAction
         if (!action) return
         setConfirmAction(null)
-        toggleRepost(client, action.post)
-          .then((patch) => {
-            setItems((prev) =>
-              prev.map((it) =>
-                it.subjectPost && it.subjectPost.uri === action.post.uri ? { ...it, subjectPost: { ...it.subjectPost, ...patch } } : it,
-              ),
-            )
-            setError(undefined)
-          })
-          .catch(() => {
-            setError('リポストに失敗しました')
-          })
+        if (action.type === 'repost') {
+          toggleRepost(client, action.post)
+            .then((patch) => {
+              setItems((prev) =>
+                prev.map((it) =>
+                  it.subjectPost && it.subjectPost.uri === action.post.uri ? { ...it, subjectPost: { ...it.subjectPost, ...patch } } : it,
+                ),
+              )
+              setError(undefined)
+            })
+            .catch(() => {
+              setError('リポストに失敗しました')
+            })
+        }
         return
       }
       if (input === 'n' || key.escape) {
@@ -238,6 +240,7 @@ export function NotificationsScreen({
               )}
               {(item.reason === 'like' || item.reason === 'repost') && item.subjectPost && (
                 <Box
+                  flexDirection="column"
                   width="100%"
                   borderStyle="single"
                   borderTop={false}
@@ -252,6 +255,7 @@ export function NotificationsScreen({
                   <Text color="#666666" wrap="truncate-end">
                     {item.subjectPost.text.replace(/\s*\n+\s*/g, ' ').trim()}
                   </Text>
+                  <Text color={item.subjectPost.viewerRepostUri ? 'green' : undefined}>↻ {item.subjectPost.repostCount}</Text>
                 </Box>
               )}
               {showsPostItem && (

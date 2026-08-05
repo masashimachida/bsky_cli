@@ -200,14 +200,16 @@ export function ThreadScreen({
         const action = confirmAction
         if (!action) return
         setConfirmAction(null)
-        toggleRepost(client, action.post)
-          .then((patch) => {
-            setPosts((prev) => prev.map((p) => (p.uri === action.post.uri ? { ...p, ...patch } : p)))
-            setError(undefined)
-          })
-          .catch(() => {
-            setError('リポストに失敗しました')
-          })
+        if (action.type === 'repost') {
+          toggleRepost(client, action.post)
+            .then((patch) => {
+              setPosts((prev) => prev.map((p) => (p.uri === action.post.uri ? { ...p, ...patch } : p)))
+              setError(undefined)
+            })
+            .catch(() => {
+              setError('リポストに失敗しました')
+            })
+        }
         return
       }
       if (input === 'n' || key.escape) {

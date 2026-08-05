@@ -180,14 +180,16 @@ export function ProfileScreen({
         const action = confirmAction
         if (!action) return
         setConfirmAction(null)
-        toggleRepost(client, action.post)
-          .then((patch) => {
-            setItems((prev) => prev.map((it) => (it.post.uri === action.post.uri ? { ...it, post: { ...it.post, ...patch } } : it)))
-            setFeedError(undefined)
-          })
-          .catch(() => {
-            setFeedError('リポストに失敗しました')
-          })
+        if (action.type === 'repost') {
+          toggleRepost(client, action.post)
+            .then((patch) => {
+              setItems((prev) => prev.map((it) => (it.post.uri === action.post.uri ? { ...it, post: { ...it.post, ...patch } } : it)))
+              setFeedError(undefined)
+            })
+            .catch(() => {
+              setFeedError('リポストに失敗しました')
+            })
+        }
         return
       }
       if (input === 'n' || key.escape) {
@@ -211,6 +213,12 @@ export function ProfileScreen({
     return (
       <Box flexDirection="column">
         <StatusBar hint=" " error={profileError} />
+        {confirmAction?.type === 'repost' && (
+          <ConfirmDialog
+            message="この投稿をリポストしますか?"
+            confirmLabel={confirmAction.post.viewerRepostUri ? 'y: リポスト解除' : 'y: リポスト'}
+          />
+        )}
       </Box>
     )
   }
@@ -218,6 +226,12 @@ export function ProfileScreen({
     return (
       <Box flexDirection="column">
         <StatusBar hint=" " status="読み込み中..." />
+        {confirmAction?.type === 'repost' && (
+          <ConfirmDialog
+            message="この投稿をリポストしますか?"
+            confirmLabel={confirmAction.post.viewerRepostUri ? 'y: リポスト解除' : 'y: リポスト'}
+          />
+        )}
       </Box>
     )
   }
