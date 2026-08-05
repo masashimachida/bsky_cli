@@ -55,9 +55,10 @@ export function dedupeTimelineItems(items: TimelineItem[]): TimelineItem[] {
       continue
     }
     mergedByUri.set(item.post.uri, {
-      ...existing,
       ...item,
-      connectsToNext: existing.connectsToNext || item.connectsToNext,
+      ...existing,
+      post: existing.post,
+      connectsToNext: existing.connectsToNext,
       replyToHandle: existing.replyToHandle ?? item.replyToHandle,
       repostedBy: existing.repostedBy ?? item.repostedBy,
     })
