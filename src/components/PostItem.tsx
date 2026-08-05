@@ -38,7 +38,6 @@ export function PostItem({
       <Box flexDirection="column" paddingLeft={replyToHandle && !repostedByHandle ? 2 : 0}>
         <Box>
           <Text bold color="yellow">{post.author.displayName ?? post.author.handle}</Text>
-          <Text color="#666666"> @{post.author.handle}</Text>
           <Text color="#666666"> · {formatRelativeTime(post.createdAt)}</Text>
         </Box>
         <Text>{post.text}</Text>

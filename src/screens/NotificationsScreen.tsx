@@ -190,7 +190,6 @@ export function NotificationsScreen({
                   paddingRight={3}
                 >
                   <Text bold color="yellow">{item.author.displayName ?? item.author.handle}</Text>
-                  <Text color="#666666"> @{item.author.handle}</Text>
                   <Text bold={!item.isRead}> {REASON_LABEL[item.reason]}</Text>
                   <Text color="#666666"> · {formatRelativeTime(item.indexedAt)}</Text>
                 </Box>
