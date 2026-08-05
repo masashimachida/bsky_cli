@@ -1,13 +1,16 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Box, useInput } from 'ink'
+import open from 'open'
 import { PostItem } from '../components/PostItem.js'
 import { StatusBar } from '../components/StatusBar.js'
 import { ConfirmDialog } from '../components/ConfirmDialog.js'
 import { ScrollingViewport, OVERHEAD_ROWS } from '../components/ScrollingViewport.js'
 import { dedupeTimelineItems, deletePost, fetchTimeline, toggleLike, toggleRepost } from '../api/client.js'
+import { postWebUrl } from '../api/format.js'
 import { resolveListNavigation } from '../keymap/vim-list-keymap.js'
 import { resolveGlobalAction } from '../keymap/global-keymap.js'
 import { useTerminalRows } from '../navigation/useTerminalRows.js'
+import type { ConfirmAction } from './confirm-action.js'
 import type { AtpClient } from '../api/atp-client.js'
 import type { PostSummary, TimelineItem } from '../api/types.js'
 
@@ -43,7 +46,7 @@ export function TimelineScreen({
   const [error, setError] = useState<string>()
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const isLoadingMoreRef = useRef(false)
-  const [confirmDeleteTarget, setConfirmDeleteTarget] = useState<PostSummary | null>(null)
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
   // dedupeTimelineItemsのseenUris/seenRootUrisをページをまたいで永続化する
   // (公式実装のFeedTunerインスタンスと同じ理由)。毎回新規Setで全アイテムを再dedupeすると、
   // 既に破棄されたスライスの投稿が後続ページで「初見」扱いになり単独浮遊表示されてしまう。
@@ -167,9 +170,12 @@ export function TimelineScreen({
       if (action === 'reply') onReply(current.post)
       if (action === 'compose') onCompose()
       if (action === 'view-author') onOpenProfile(current.post.author.did)
+      if (action === 'open-link') {
+        open(postWebUrl(current.post)).catch(() => {})
+      }
       if (action === 'delete') {
         if (current.post.author.did === client.did) {
-          setConfirmDeleteTarget(current.post)
+          setConfirmAction({ type: 'delete', post: current.post })
         }
       }
       if (action === 'like') {
@@ -178,39 +184,49 @@ export function TimelineScreen({
         })
       }
       if (action === 'repost') {
-        toggleRepost(client, current.post).then((patch) => {
-          setItems((prev) => prev.map((it, i) => (i === index ? { ...it, post: { ...it.post, ...patch } } : it)))
-        })
+        setConfirmAction({ type: 'repost', post: current.post })
       }
     },
-    { isActive: active && !confirmDeleteTarget },
+    { isActive: active && !confirmAction },
   )
 
   useInput(
     (input, key) => {
       if (input === 'y') {
-        const target = confirmDeleteTarget
-        if (!target) return
-        setConfirmDeleteTarget(null)
-        deletePost(client, target)
-          .then(() => {
-            setItems((prev) => {
-              const next = prev.filter((it) => it.post.uri !== target.uri)
-              setIndex((i) => Math.min(i, Math.max(0, next.length - 1)))
-              return next
+        const action = confirmAction
+        if (!action) return
+        setConfirmAction(null)
+        if (action.type === 'delete') {
+          deletePost(client, action.post)
+            .then(() => {
+              setItems((prev) => {
+                const next = prev.filter((it) => it.post.uri !== action.post.uri)
+                setIndex((i) => Math.min(i, Math.max(0, next.length - 1)))
+                return next
+              })
+              setError(undefined)
             })
-            setError(undefined)
-          })
-          .catch(() => {
-            setError('削除に失敗しました')
-          })
+            .catch(() => {
+              setError('削除に失敗しました')
+            })
+        }
+        if (action.type === 'repost') {
+          toggleRepost(client, action.post)
+            .then((patch) => {
+              setItems((prev) => prev.map((it) => (it.post.uri === action.post.uri ? { ...it, post: { ...it.post, ...patch } } : it)))
+              setError(undefined)
+            })
+            .catch(() => {
+              setError('リポストに失敗しました')
+            })
+        }
         return
       }
       if (input === 'n' || key.escape) {
-        setConfirmDeleteTarget(null)
+        setConfirmAction(null)
       }
     },
-    { isActive: active && !!confirmDeleteTarget },
+    { isActive: active && !!confirmAction },
   )
 
   const rows = useTerminalRows()
@@ -248,7 +264,13 @@ export function TimelineScreen({
         )}
       />
       <StatusBar hint=" " status={isLoadingMore ? '読み込み中...' : undefined} error={error} />
-      {confirmDeleteTarget && <ConfirmDialog message="この投稿を削除しますか?" />}
+      {confirmAction?.type === 'delete' && <ConfirmDialog message="この投稿を削除しますか?" />}
+      {confirmAction?.type === 'repost' && (
+        <ConfirmDialog
+          message="この投稿をリポストしますか?"
+          confirmLabel={confirmAction.post.viewerRepostUri ? 'y: リポスト解除' : 'y: リポスト'}
+        />
+      )}
     </Box>
   )
 }
