@@ -311,8 +311,9 @@ describe('dedupeTimelineItems', () => {
     expect(result.map((it) => it.post.uri)).toEqual(['at://p/a', 'at://p/b', 'at://p/c'])
     // Aは複製(connectsToNext)のまま表示位置を保持しつつ、独立投稿としての情報(replyToHandle無し)を維持する
     expect(result[0]?.connectsToNext).toBe(true)
-    // Bはconnects複製とreplyToHandle付き本体の両方の情報を失わない: 罫線接続(connectsToNext)と返信元表示(replyToHandle)の少なくとも一方は保持される
-    expect(result[1]?.connectsToNext || result[1]?.replyToHandle).toBeTruthy()
+    // Bはconnects複製とreplyToHandle付き本体の両方の情報を失わない: 罫線接続(connectsToNext)と返信元表示(replyToHandle)の両方が保持される
+    expect(result[1]?.connectsToNext).toBe(true)
+    expect(result[1]?.replyToHandle).toBe('author-of-a')
     // Cは本体のみなのでreplyToHandleを維持する
     expect(result[2]?.replyToHandle).toBe('author-of-b')
   })

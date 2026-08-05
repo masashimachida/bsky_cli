@@ -43,16 +43,33 @@ export async function fetchAuthorFeed(client: AtpClient, actor: string, cursor?:
   return { items: res.data.feed.flatMap((f) => toTimelineItems(f as never)), cursor: res.data.cursor }
 }
 
-// 返信先の親投稿を独立したアイテムとして表示するため(toTimelineItems)、
-// 同じ投稿が「返信ペアの親」と「元々のフィード内の投稿」の両方として
-// 重複して現れることがある。表示直前にuriベースで最初の1件だけ残す。
+// 返信先の複製(connectsToNextのみのプレースホルダ)と、同じ投稿が別のfeedエントリで
+// 本体(replyToHandle付き)として登場したものが重複する場合、両方の情報をマージする。
+// 表示位置は最初に登場した位置を採用する。
 export function dedupeTimelineItems(items: TimelineItem[]): TimelineItem[] {
+  const mergedByUri = new Map<string, TimelineItem>()
+  for (const item of items) {
+    const existing = mergedByUri.get(item.post.uri)
+    if (!existing) {
+      mergedByUri.set(item.post.uri, item)
+      continue
+    }
+    mergedByUri.set(item.post.uri, {
+      ...existing,
+      ...item,
+      connectsToNext: existing.connectsToNext || item.connectsToNext,
+      replyToHandle: existing.replyToHandle ?? item.replyToHandle,
+      repostedBy: existing.repostedBy ?? item.repostedBy,
+    })
+  }
   const seen = new Set<string>()
-  return items.filter((item) => {
-    if (seen.has(item.post.uri)) return false
+  const result: TimelineItem[] = []
+  for (const item of items) {
+    if (seen.has(item.post.uri)) continue
     seen.add(item.post.uri)
-    return true
-  })
+    result.push(mergedByUri.get(item.post.uri)!)
+  }
+  return result
 }
 
 export async function fetchNotifications(client: AtpClient, cursor?: string): Promise<Page<NotificationItem>> {
