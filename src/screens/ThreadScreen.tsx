@@ -1,14 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Box, useInput } from 'ink'
+import open from 'open'
 import type { AppBskyFeedDefs } from '@atproto/api'
 import { PostItem } from '../components/PostItem.js'
 import { StatusBar } from '../components/StatusBar.js'
+import { ConfirmDialog } from '../components/ConfirmDialog.js'
 import { ScrollingViewport, OVERHEAD_ROWS } from '../components/ScrollingViewport.js'
-import { toPostSummary } from '../api/format.js'
+import { postWebUrl, toPostSummary } from '../api/format.js'
 import { toggleLike, toggleRepost } from '../api/client.js'
 import { resolveListNavigation } from '../keymap/vim-list-keymap.js'
 import { resolveGlobalAction } from '../keymap/global-keymap.js'
 import { useTerminalRows } from '../navigation/useTerminalRows.js'
+import type { ConfirmAction } from './confirm-action.js'
 import type { AtpClient } from '../api/atp-client.js'
 import type { PostSummary } from '../api/types.js'
 
@@ -71,6 +74,7 @@ export function ThreadScreen({
   onOpenProfile: (actor: string) => void
 }) {
   const [posts, setPosts] = useState<PostSummary[]>(initialPosts)
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
   const [index, setIndex] = useState(initialIndex)
   const [focusUri, setFocusUri] = useState<string | undefined>(() => initialPosts[initialIndex]?.uri)
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null)
@@ -175,18 +179,42 @@ export function ThreadScreen({
       const action = resolveGlobalAction(input, key)
       if (action === 'reply') onReply(current, posts[0] ?? current)
       if (action === 'view-author') onOpenProfile(current.author.did)
+      if (action === 'open-link') {
+        open(postWebUrl(current)).catch(() => {})
+      }
       if (action === 'like') {
         toggleLike(client, current).then((patch) => {
           setPosts((prev) => prev.map((p, i) => (i === index ? { ...p, ...patch } : p)))
         })
       }
       if (action === 'repost') {
-        toggleRepost(client, current).then((patch) => {
-          setPosts((prev) => prev.map((p, i) => (i === index ? { ...p, ...patch } : p)))
-        })
+        setConfirmAction({ type: 'repost', post: current })
       }
     },
-    { isActive: active },
+    { isActive: active && !confirmAction },
+  )
+
+  useInput(
+    (input, key) => {
+      if (input === 'y') {
+        const action = confirmAction
+        if (!action) return
+        setConfirmAction(null)
+        toggleRepost(client, action.post)
+          .then((patch) => {
+            setPosts((prev) => prev.map((p) => (p.uri === action.post.uri ? { ...p, ...patch } : p)))
+            setError(undefined)
+          })
+          .catch(() => {
+            setError('リポストに失敗しました')
+          })
+        return
+      }
+      if (input === 'n' || key.escape) {
+        setConfirmAction(null)
+      }
+    },
+    { isActive: active && !!confirmAction },
   )
 
   const rows = useTerminalRows()
@@ -214,6 +242,12 @@ export function ThreadScreen({
         )}
       />
       <StatusBar hint=" " error={error} />
+      {confirmAction?.type === 'repost' && (
+        <ConfirmDialog
+          message="この投稿をリポストしますか?"
+          confirmLabel={confirmAction.post.viewerRepostUri ? 'y: リポスト解除' : 'y: リポスト'}
+        />
+      )}
     </Box>
   )
 }
