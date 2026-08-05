@@ -106,9 +106,33 @@ export function dedupeTimelineItems(items: TimelineItem[], seenUris: Set<string>
   return result
 }
 
+const GROUPABLE_NOTIFICATION_REASONS: NotificationItem['reason'][] = ['like', 'repost', 'follow']
+
+// Bluesky公式Web版(bluesky-social/social-app)のgroupNotificationsを参考にした簡易版。
+// 同じ対象(reasonSubjectUri)への同種の反応(like/repost/follow)を1件にまとめ、
+// 「〇〇および他n人が...」という表示を可能にする。公式と異なり時間窓(48時間以内)は設けない
+// (通知リストは基本的に新しい順であり、実用上問題にならないため)。
+export function groupNotificationItems(items: NotificationItem[]): NotificationItem[] {
+  const grouped: NotificationItem[] = []
+  for (const item of items) {
+    if (GROUPABLE_NOTIFICATION_REASONS.includes(item.reason)) {
+      const existing = grouped.find(
+        (g) => g.reason === item.reason && g.reasonSubjectUri === item.reasonSubjectUri && g.author.did !== item.author.did,
+      )
+      if (existing) {
+        existing.additionalAuthors = [...(existing.additionalAuthors ?? []), item.author]
+        existing.isRead = existing.isRead && item.isRead
+        continue
+      }
+    }
+    grouped.push({ ...item })
+  }
+  return grouped
+}
+
 export async function fetchNotifications(client: AtpClient, cursor?: string): Promise<Page<NotificationItem>> {
   const res = await client.listNotifications({ cursor, limit: PAGE_SIZE })
-  const items = res.data.notifications.map((n) => toNotificationItem(n as never))
+  const items = groupNotificationItems(res.data.notifications.map((n) => toNotificationItem(n as never)))
 
   const allUris = Array.from(
     new Set(

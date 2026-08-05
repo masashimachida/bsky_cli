@@ -13,6 +13,7 @@ export function PostItem({
   connectsToNext,
   indent,
   showThreadHint,
+  replyIndent = true,
 }: {
   post: PostSummary
   selected: boolean
@@ -22,7 +23,11 @@ export function PostItem({
   connectsToNext?: boolean
   indent?: boolean
   showThreadHint?: boolean
+  // NotificationsScreenでは「返信」通知であること自体はマーカーで既に分かるため、
+  // TimelineScreen等のスレッド文脈表示のような追加インデントは不要。falseで抑制する。
+  replyIndent?: boolean
 }) {
+  const showsReplyIndent = !!replyToHandle && !repostedByHandle && replyIndent
   return (
     <Box
       flexDirection="column"
@@ -34,12 +39,12 @@ export function PostItem({
       borderLeft={true}
       borderBottomColor="gray"
       borderLeftColor={selected ? 'cyan' : 'gray'}
-      paddingLeft={(replyToHandle && !repostedByHandle ? 2 : 1) + (indent ? 2 : 0)}
+      paddingLeft={(showsReplyIndent ? 2 : 1) + (indent ? 2 : 0)}
       paddingRight={3}
     >
       {repostedByHandle && <Text color="#666666">@{repostedByHandle} がリポスト</Text>}
       {replyToHandle && <Text color="#666666">↳ @{replyToHandle} への返信</Text>}
-      <Box flexDirection="column" paddingLeft={replyToHandle && !repostedByHandle ? 2 : 0}>
+      <Box flexDirection="column" paddingLeft={showsReplyIndent ? 2 : 0}>
         <Box>
           <Text bold color="yellow">{post.author.displayName ?? post.author.handle}</Text>
           <Text color="#666666"> · {formatRelativeTime(post.createdAt)}</Text>

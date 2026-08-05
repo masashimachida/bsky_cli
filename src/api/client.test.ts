@@ -10,10 +10,11 @@ import {
   toggleRepost,
   deletePost,
   dedupeTimelineItems,
+  groupNotificationItems,
 } from './client.js'
 import { toTimelineItems } from './format.js'
 import type { AtpClient } from './atp-client.js'
-import type { PostSummary, TimelineItem } from './types.js'
+import type { NotificationItem, PostSummary, TimelineItem } from './types.js'
 
 const author = { did: 'did:plc:1', handle: 'a.bsky.social' }
 const rawPost = {
@@ -505,5 +506,107 @@ describe('dedupeTimelineItems', () => {
     expect(result[0]?.post.uri).toBe('at://p/target')
     // 先に流れてきた(=より新しい)Bのリポストの表記が残る
     expect(result[0]?.repostedBy?.handle).toBe('b.bsky.social')
+  })
+})
+
+function makeNotification(overrides: Partial<NotificationItem> = {}): NotificationItem {
+  return {
+    uri: 'at://n/1',
+    author: { did: 'did:plc:default', handle: 'default.bsky.social' },
+    reason: 'like',
+    reasonSubjectUri: 'at://p/target',
+    isRead: true,
+    indexedAt: '2026-08-01T00:00:00.000Z',
+    ...overrides,
+  }
+}
+
+describe('groupNotificationItems', () => {
+  it('同じreason・同じreasonSubjectUri・異なる著者のlike通知は1件にグルーピングされる', () => {
+    const items: NotificationItem[] = [
+      makeNotification({ uri: 'at://n/1', author: { did: 'did:plc:a', handle: 'a.bsky.social' } }),
+      makeNotification({ uri: 'at://n/2', author: { did: 'did:plc:b', handle: 'b.bsky.social' } }),
+    ]
+    const result = groupNotificationItems(items)
+    expect(result).toHaveLength(1)
+    expect(result[0]?.author.handle).toBe('a.bsky.social')
+    expect(result[0]?.additionalAuthors?.map((a) => a.handle)).toEqual(['b.bsky.social'])
+  })
+
+  it('3人以上のlikeは全員additionalAuthorsに積み上がる', () => {
+    const items: NotificationItem[] = [
+      makeNotification({ uri: 'at://n/1', author: { did: 'did:plc:a', handle: 'a.bsky.social' } }),
+      makeNotification({ uri: 'at://n/2', author: { did: 'did:plc:b', handle: 'b.bsky.social' } }),
+      makeNotification({ uri: 'at://n/3', author: { did: 'did:plc:c', handle: 'c.bsky.social' } }),
+    ]
+    const result = groupNotificationItems(items)
+    expect(result).toHaveLength(1)
+    expect(result[0]?.additionalAuthors?.map((a) => a.handle)).toEqual(['b.bsky.social', 'c.bsky.social'])
+  })
+
+  it('reasonSubjectUriが異なれば別グループのまま', () => {
+    const items: NotificationItem[] = [
+      makeNotification({ uri: 'at://n/1', reasonSubjectUri: 'at://p/1', author: { did: 'did:plc:a', handle: 'a.bsky.social' } }),
+      makeNotification({ uri: 'at://n/2', reasonSubjectUri: 'at://p/2', author: { did: 'did:plc:b', handle: 'b.bsky.social' } }),
+    ]
+    const result = groupNotificationItems(items)
+    expect(result).toHaveLength(2)
+  })
+
+  it('reasonが異なれば(like と repost)別グループのまま', () => {
+    const items: NotificationItem[] = [
+      makeNotification({ uri: 'at://n/1', reason: 'like', author: { did: 'did:plc:a', handle: 'a.bsky.social' } }),
+      makeNotification({ uri: 'at://n/2', reason: 'repost', author: { did: 'did:plc:b', handle: 'b.bsky.social' } }),
+    ]
+    const result = groupNotificationItems(items)
+    expect(result).toHaveLength(2)
+  })
+
+  it('reply/mention/quote/otherはグルーピング対象外(常に個別のまま)', () => {
+    const items: NotificationItem[] = [
+      makeNotification({ uri: 'at://n/1', reason: 'reply', reasonSubjectUri: 'at://p/1', author: { did: 'did:plc:a', handle: 'a.bsky.social' } }),
+      makeNotification({ uri: 'at://n/2', reason: 'reply', reasonSubjectUri: 'at://p/1', author: { did: 'did:plc:b', handle: 'b.bsky.social' } }),
+    ]
+    const result = groupNotificationItems(items)
+    expect(result).toHaveLength(2)
+  })
+
+  it('followはreasonSubjectUriが無くても、reasonが同じなら正しくグルーピングされる', () => {
+    const items: NotificationItem[] = [
+      makeNotification({ uri: 'at://n/1', reason: 'follow', reasonSubjectUri: undefined, author: { did: 'did:plc:a', handle: 'a.bsky.social' } }),
+      makeNotification({ uri: 'at://n/2', reason: 'follow', reasonSubjectUri: undefined, author: { did: 'did:plc:b', handle: 'b.bsky.social' } }),
+    ]
+    const result = groupNotificationItems(items)
+    expect(result).toHaveLength(1)
+    expect(result[0]?.additionalAuthors?.map((a) => a.handle)).toEqual(['b.bsky.social'])
+  })
+
+  it('グループ内のいずれかが未読なら、グループ全体が未読扱いになる', () => {
+    const items: NotificationItem[] = [
+      makeNotification({ uri: 'at://n/1', isRead: true, author: { did: 'did:plc:a', handle: 'a.bsky.social' } }),
+      makeNotification({ uri: 'at://n/2', isRead: false, author: { did: 'did:plc:b', handle: 'b.bsky.social' } }),
+    ]
+    const result = groupNotificationItems(items)
+    expect(result[0]?.isRead).toBe(false)
+  })
+
+  it('全部既読なら、グループも既読のまま', () => {
+    const items: NotificationItem[] = [
+      makeNotification({ uri: 'at://n/1', isRead: true, author: { did: 'did:plc:a', handle: 'a.bsky.social' } }),
+      makeNotification({ uri: 'at://n/2', isRead: true, author: { did: 'did:plc:b', handle: 'b.bsky.social' } }),
+    ]
+    const result = groupNotificationItems(items)
+    expect(result[0]?.isRead).toBe(true)
+  })
+
+  it('離れた位置にある通知同士でも(間に他の通知が挟まっても)同条件ならグルーピングされる', () => {
+    const items: NotificationItem[] = [
+      makeNotification({ uri: 'at://n/1', author: { did: 'did:plc:a', handle: 'a.bsky.social' } }),
+      makeNotification({ uri: 'at://n/mid', reason: 'follow', reasonSubjectUri: undefined, author: { did: 'did:plc:z', handle: 'z.bsky.social' } }),
+      makeNotification({ uri: 'at://n/2', author: { did: 'did:plc:b', handle: 'b.bsky.social' } }),
+    ]
+    const result = groupNotificationItems(items)
+    expect(result).toHaveLength(2)
+    expect(result[0]?.additionalAuthors?.map((a) => a.handle)).toEqual(['b.bsky.social'])
   })
 })

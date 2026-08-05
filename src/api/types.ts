@@ -61,4 +61,6 @@ export interface NotificationItem {
   indexedAt: string
   subjectPost?: PostSummary
   replyToHandle?: string
+  // 同一対象への同種の通知(like/repost/follow)をグルーピングした際の、代表(最新)以外の著者。
+  additionalAuthors?: Author[]
 }

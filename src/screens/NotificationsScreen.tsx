@@ -189,7 +189,10 @@ export function NotificationsScreen({
                   paddingLeft={1}
                   paddingRight={3}
                 >
-                  <Text bold color="yellow">{item.author.displayName ?? item.author.handle}</Text>
+                  <Text bold color="yellow">
+                    {item.author.displayName ?? item.author.handle}
+                    {item.additionalAuthors && item.additionalAuthors.length > 0 && ` および他${item.additionalAuthors.length}人`}
+                  </Text>
                   <Text bold={!item.isRead}> {REASON_LABEL[item.reason]}</Text>
                   <Text color="#666666"> · {formatRelativeTime(item.indexedAt)}</Text>
                 </Box>
@@ -218,6 +221,7 @@ export function NotificationsScreen({
                   selected={selected}
                   expanded={false}
                   replyToHandle={item.reason === 'reply' ? item.replyToHandle : undefined}
+                  replyIndent={false}
                 />
               )}
             </Box>
