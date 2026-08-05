@@ -212,6 +212,9 @@ export function toTimelineItems(feedViewPost: RawFeedViewPost): TimelineItem[] {
         items.push({ post: toPostSummary(root), connectsToNext: true, isThreadRoot: true, isSliceRoot: true, sliceKey, rootUri })
       }
       if (isRawPostView(parent)) {
+        // parent複製自体は「誰への返信か」の↳マーカーを付けない。root自身への直接返信の
+        // 場合は判定できるが、それ以外(grandparent以上への返信)は判定できず表示が不揃いに
+        // なるため、一律付けない方針にした。文脈表示であることはindent(呼び出し元)で示す。
         items.push({ post: toPostSummary(parent), connectsToNext: true, isSliceRoot: !hasSeparateRoot, sliceKey, rootUri })
       }
     }

@@ -14,6 +14,7 @@ export function PostItem({
   indent,
   showThreadHint,
   replyIndent = true,
+  showReplyMarker = true,
 }: {
   post: PostSummary
   selected: boolean
@@ -26,6 +27,10 @@ export function PostItem({
   // NotificationsScreenでは「返信」通知であること自体はマーカーで既に分かるため、
   // TimelineScreen等のスレッド文脈表示のような追加インデントは不要。falseで抑制する。
   replyIndent?: boolean
+  // TimelineScreenでは、返信先がroot自身への直接返信の場合しか判定できず、
+  // 深い連鎖では表示されたりされなかったりして不揃いになるため、マーカー自体を出さない。
+  // インデント(showsReplyIndent)自体は文脈表示として維持する。
+  showReplyMarker?: boolean
 }) {
   const showsReplyIndent = !!replyToHandle && !repostedByHandle && replyIndent
   return (
@@ -39,12 +44,12 @@ export function PostItem({
       borderLeft={true}
       borderBottomColor="gray"
       borderLeftColor={selected ? 'cyan' : 'gray'}
-      paddingLeft={(showsReplyIndent ? 2 : 1) + (indent ? 2 : 0)}
+      paddingLeft={showsReplyIndent || indent ? 2 : 1}
       paddingRight={3}
     >
       {repostedByHandle && <Text color="#666666">@{repostedByHandle} がリポスト</Text>}
-      {replyToHandle && <Text color="#666666">↳ @{replyToHandle} への返信</Text>}
-      <Box flexDirection="column" paddingLeft={showsReplyIndent ? 2 : 0}>
+      {replyToHandle && showReplyMarker && <Text color="#666666">↳ @{replyToHandle} への返信</Text>}
+      <Box flexDirection="column" paddingLeft={showsReplyIndent || indent ? 2 : 0}>
         <Box>
           <Text bold color="yellow">{post.author.displayName ?? post.author.handle}</Text>
           <Text color="#666666"> · {formatRelativeTime(post.createdAt)}</Text>

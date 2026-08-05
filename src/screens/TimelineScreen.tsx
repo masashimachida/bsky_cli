@@ -243,6 +243,7 @@ export function TimelineScreen({
             connectsToNext={item.connectsToNext}
             showThreadHint={item.isThreadRoot}
             indent={item.connectsToNext && !item.isSliceRoot}
+            showReplyMarker={false}
           />
         )}
       />

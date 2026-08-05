@@ -282,6 +282,18 @@ describe('toTimelineItems', () => {
     expect(result[2].rootUri).toBe('at://did:plc:abc/app.bsky.feed.post/root')
   })
 
+  it('root!==parentの場合、parent複製にはreplyToHandleを設定しない(↳マーカーは出さず、indentのみで文脈表示と示す)', () => {
+    const rootPost = { ...rawPostView, uri: 'at://did:plc:abc/app.bsky.feed.post/root', author: { ...rawAuthor, handle: 'carol.bsky.social' } }
+    const parentPost = { ...rawPostView, uri: 'at://did:plc:abc/app.bsky.feed.post/parent', author: { ...rawAuthor, handle: 'bob.bsky.social' } }
+    const feedViewPost = {
+      post: rawPostView,
+      reply: { root: rootPost, parent: parentPost },
+    } as never
+    const result = toTimelineItems(feedViewPost)
+    expect(result[1].post.uri).toBe('at://did:plc:abc/app.bsky.feed.post/parent')
+    expect(result[1].replyToHandle).toBeUndefined()
+  })
+
   it('replyが無ければrootUriは自分自身のuri', () => {
     const feedViewPost = { post: rawPostView } as never
     expect(toTimelineItems(feedViewPost)[0].rootUri).toBe(rawPostView.uri)
