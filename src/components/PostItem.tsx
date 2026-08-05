@@ -11,6 +11,7 @@ export function PostItem({
   repostedByHandle,
   replyToHandle,
   connectsToNext,
+  indent,
 }: {
   post: PostSummary
   selected: boolean
@@ -18,6 +19,7 @@ export function PostItem({
   repostedByHandle?: string
   replyToHandle?: string
   connectsToNext?: boolean
+  indent?: boolean
 }) {
   return (
     <Box
@@ -30,7 +32,7 @@ export function PostItem({
       borderLeft={true}
       borderBottomColor="gray"
       borderLeftColor={selected ? 'cyan' : 'gray'}
-      paddingLeft={replyToHandle && !repostedByHandle ? 2 : 1}
+      paddingLeft={(replyToHandle && !repostedByHandle ? 2 : 1) + (indent ? 2 : 0)}
       paddingRight={3}
     >
       {repostedByHandle && <Text color="#666666">@{repostedByHandle} がリポスト</Text>}

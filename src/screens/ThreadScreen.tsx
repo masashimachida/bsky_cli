@@ -33,8 +33,8 @@ function collectReplies(nodes: unknown[]): PostSummary[] {
   return result
 }
 
-function flattenThread(thread: unknown): PostSummary[] {
-  if (!isThreadViewPost(thread)) return []
+function flattenThread(thread: unknown): { posts: PostSummary[]; currentIndex: number } {
+  if (!isThreadViewPost(thread)) return { posts: [], currentIndex: 0 }
 
   const parentChain: PostSummary[] = []
   let node: unknown = thread.parent
@@ -46,7 +46,7 @@ function flattenThread(thread: unknown): PostSummary[] {
   const current = toPostSummary(thread.post as never)
   const replies = collectReplies(thread.replies ?? [])
 
-  return [...parentChain, current, ...replies]
+  return { posts: [...parentChain, current, ...replies], currentIndex: parentChain.length }
 }
 
 export function ThreadScreen({
@@ -72,6 +72,7 @@ export function ThreadScreen({
 }) {
   const [posts, setPosts] = useState<PostSummary[]>(initialPosts)
   const [index, setIndex] = useState(initialIndex)
+  const [focusUri, setFocusUri] = useState<string | undefined>(() => initialPosts[initialIndex]?.uri)
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null)
   const isExpanded = expandedIndex !== null && expandedIndex === index
   const [loading, setLoading] = useState(initialPosts.length === 0)
@@ -89,7 +90,10 @@ export function ThreadScreen({
       .getPostThread({ uri })
       .then((res) => {
         if (cancelled) return
-        setPosts(flattenThread(res.data.thread as AppBskyFeedDefs.ThreadViewPost))
+        const { posts: flat, currentIndex } = flattenThread(res.data.thread as AppBskyFeedDefs.ThreadViewPost)
+        setPosts(flat)
+        setIndex(currentIndex)
+        setFocusUri(flat[currentIndex]?.uri)
         setError(undefined)
       })
       .catch(() => {
@@ -205,7 +209,9 @@ export function ThreadScreen({
         availableRows={availableRows}
         isSelectedExpanded={isExpanded}
         getKey={(post) => post.uri}
-        renderItem={(post, selected) => <PostItem post={post} selected={selected} expanded={selected && isExpanded} />}
+        renderItem={(post, selected) => (
+          <PostItem post={post} selected={selected} expanded={selected && isExpanded} indent={post.uri !== focusUri} />
+        )}
       />
       <StatusBar hint=" " error={error} />
     </Box>
