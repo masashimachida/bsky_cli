@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { toAuthor, toPostSummary, toTimelineItems, toNotificationItem, formatRelativeTime } from './format.js'
+import { toAuthor, toPostSummary, toTimelineItems, toNotificationItem, formatRelativeTime, postWebUrl } from './format.js'
 
 const rawAuthor = {
   did: 'did:plc:abc',
@@ -428,5 +428,13 @@ describe('toNotificationItem', () => {
       indexedAt: '2026-08-01T00:00:00.000Z',
     })
     expect(unknown.reason).toBe('other')
+  })
+})
+
+describe('postWebUrl', () => {
+  it('uriのrkeyとauthorのhandleからBluesky Web版のURLを組み立てる', () => {
+    const post = { ...rawPostView, uri: 'at://did:plc:abc/app.bsky.feed.post/xyz123' }
+    const result = toPostSummary(post as never)
+    expect(postWebUrl(result)).toBe('https://bsky.app/profile/alice.bsky.social/post/xyz123')
   })
 })

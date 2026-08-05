@@ -242,3 +242,8 @@ export function toNotificationItem(n: RawNotification): NotificationItem {
     indexedAt: n.indexedAt,
   }
 }
+
+export function postWebUrl(post: PostSummary): string {
+  const rkey = post.uri.split('/').pop()
+  return `https://bsky.app/profile/${post.author.handle}/post/${rkey}`
+}
