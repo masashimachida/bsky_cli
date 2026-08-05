@@ -437,4 +437,14 @@ describe('postWebUrl', () => {
     const result = toPostSummary(post as never)
     expect(postWebUrl(result)).toBe('https://bsky.app/profile/alice.bsky.social/post/xyz123')
   })
+
+  it('authorのhandleがhandle.invalidの場合はdidにフォールバックする', () => {
+    const post = {
+      ...rawPostView,
+      uri: 'at://did:plc:abc/app.bsky.feed.post/xyz123',
+      author: { ...rawAuthor, handle: 'handle.invalid' },
+    }
+    const result = toPostSummary(post as never)
+    expect(postWebUrl(result)).toBe('https://bsky.app/profile/did:plc:abc/post/xyz123')
+  })
 })

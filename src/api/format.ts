@@ -245,5 +245,6 @@ export function toNotificationItem(n: RawNotification): NotificationItem {
 
 export function postWebUrl(post: PostSummary): string {
   const rkey = post.uri.split('/').pop()
-  return `https://bsky.app/profile/${post.author.handle}/post/${rkey}`
+  const identifier = post.author.handle === 'handle.invalid' ? post.author.did : post.author.handle
+  return `https://bsky.app/profile/${identifier}/post/${rkey}`
 }
