@@ -68,7 +68,7 @@ export function TimelineScreen({
     if (isLoadingMoreRef.current) return
     isLoadingMoreRef.current = true
     setIsLoadingMore(true)
-    const currentUri = items[0]?.post.uri
+    const currentUri = items[index]?.post.uri
     try {
       const page = await fetchTimeline(client, undefined)
       const newItems = dedupeTimelineItems(page.items)
@@ -83,7 +83,7 @@ export function TimelineScreen({
       isLoadingMoreRef.current = false
       setIsLoadingMore(false)
     }
-  }, [client, items])
+  }, [client, items, index])
 
   useEffect(() => {
     if (initialItems.length === 0) {
