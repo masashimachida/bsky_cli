@@ -229,6 +229,45 @@ describe('toTimelineItems', () => {
     expect(result[1].connectsToNext).toBeUndefined()
   })
 
+  it('reply.rootとreply.parentが異なる投稿なら、root・parentの両方を独立した項目として先頭に追加し、両方にconnectsToNextを立てる', () => {
+    const rootPost = { ...rawPostView, uri: 'at://did:plc:abc/app.bsky.feed.post/root', author: { ...rawAuthor, handle: 'carol.bsky.social' } }
+    const parentPost = { ...rawPostView, uri: 'at://did:plc:abc/app.bsky.feed.post/parent', author: { ...rawAuthor, handle: 'bob.bsky.social' } }
+    const feedViewPost = {
+      post: rawPostView,
+      reply: {
+        root: rootPost,
+        parent: parentPost,
+      },
+    } as never
+    const result = toTimelineItems(feedViewPost)
+    expect(result).toHaveLength(3)
+    expect(result[0].post.uri).toBe('at://did:plc:abc/app.bsky.feed.post/root')
+    expect(result[0].post.author.handle).toBe('carol.bsky.social')
+    expect(result[0].connectsToNext).toBe(true)
+    expect(result[1].post.uri).toBe('at://did:plc:abc/app.bsky.feed.post/parent')
+    expect(result[1].post.author.handle).toBe('bob.bsky.social')
+    expect(result[1].connectsToNext).toBe(true)
+    expect(result[2].post.uri).toBe(rawPostView.uri)
+    expect(result[2].replyToHandle).toBe('bob.bsky.social')
+    expect(result[2].connectsToNext).toBeUndefined()
+  })
+
+  it('reply.rootがblockedPost等(recordなし)でreply.parentが完全な投稿なら、parent複製と本体の2件のみになる', () => {
+    const parentPost = { ...rawPostView, uri: 'at://did:plc:abc/app.bsky.feed.post/parent', author: { ...rawAuthor, handle: 'bob.bsky.social' } }
+    const feedViewPost = {
+      post: rawPostView,
+      reply: {
+        root: { $type: 'app.bsky.feed.defs#blockedPost', uri: 'at://did:plc:abc/app.bsky.feed.post/root' },
+        parent: parentPost,
+      },
+    } as never
+    const result = toTimelineItems(feedViewPost)
+    expect(result).toHaveLength(2)
+    expect(result[0].post.uri).toBe('at://did:plc:abc/app.bsky.feed.post/parent')
+    expect(result[0].connectsToNext).toBe(true)
+    expect(result[1].replyToHandle).toBe('bob.bsky.social')
+  })
+
   it('返信投稿のリポストの場合、親投稿は追加せず本体にrepostedByとreplyToHandleを両方設定する', () => {
     const parentPost = { ...rawPostView, uri: 'at://did:plc:abc/app.bsky.feed.post/parent', author: { ...rawAuthor, handle: 'bob.bsky.social' } }
     const feedViewPost = {

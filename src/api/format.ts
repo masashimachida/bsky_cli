@@ -194,17 +194,20 @@ export function toTimelineItems(feedViewPost: RawFeedViewPost): TimelineItem[] {
     reason?.$type === 'app.bsky.feed.defs#reasonRepost' ? toAuthor((reason as RawReasonRepost).by) : undefined
 
   const items: TimelineItem[] = []
+  const root = feedViewPost.reply?.root
   const parent = feedViewPost.reply?.parent
   let replyToHandle: string | undefined
+
   if (parent) {
-    if (isRawPostView(parent)) {
-      if (!repostedBy) {
+    if (!repostedBy) {
+      if (root && isRawPostView(root) && root.uri !== parent.uri) {
+        items.push({ post: toPostSummary(root), connectsToNext: true })
+      }
+      if (isRawPostView(parent)) {
         items.push({ post: toPostSummary(parent), connectsToNext: true })
       }
-      replyToHandle = parent.author.handle
-    } else {
-      replyToHandle = parent.author?.handle
     }
+    replyToHandle = isRawPostView(parent) ? parent.author.handle : parent.author?.handle
   }
 
   items.push({
