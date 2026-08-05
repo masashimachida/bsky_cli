@@ -105,15 +105,20 @@ export function TimelineScreen({
   const reloadTimelineRef = useRef(reloadTimeline)
   reloadTimelineRef.current = reloadTimeline
 
+  const latestStateRef = useRef({ items, cursor, index })
+  latestStateRef.current = { items, cursor, index }
+
   useEffect(() => {
     const interval = setInterval(() => {
-      reloadTimelineRef.current()
+      // reloadTimelineは最新1ページ分しか取得しないため、下にスクロールして
+      // 古い投稿を見ている間に自動更新すると、現在位置がそのページに含まれず
+      // indexが先頭にフォールバックしてしまう。先頭にいる時だけ自動更新する。
+      if (latestStateRef.current.index === 0) {
+        reloadTimelineRef.current()
+      }
     }, AUTO_REFRESH_INTERVAL_MS)
     return () => clearInterval(interval)
   }, [])
-
-  const latestStateRef = useRef({ items, cursor, index })
-  latestStateRef.current = { items, cursor, index }
   useEffect(() => {
     return () => {
       onStateChange(latestStateRef.current)

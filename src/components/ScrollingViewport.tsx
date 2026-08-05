@@ -22,7 +22,12 @@ export function ScrollingViewport<T>({
   getKey: (item: T) => string
   renderItem: (item: T, selected: boolean) => React.ReactNode
 }) {
-  const [viewStart, setViewStart] = useState(0)
+  // 初期値をselectedIndexに応じて設定する。0固定だと、詳細画面から戻る等で
+  // このコンポーネントが再マウントされselectedIndexが既に大きい状態で始まった場合、
+  // targetIndex(selectedIndex+SCROLLOFF)がMAX_RENDER_COUNT件のスライス範囲外になり、
+  // targetRefが取得できずuseLayoutEffectの追従ロジックが一切発火しない
+  // (viewStartが0に固定されたまま、選択中の投稿が画面外に取り残される)。
+  const [viewStart, setViewStart] = useState(() => Math.max(0, selectedIndex - SCROLLOFF))
   const targetRef = useRef<DOMElement>(null)
 
   const clampedViewStart = Math.min(viewStart, Math.max(0, selectedIndex - SCROLLOFF))
