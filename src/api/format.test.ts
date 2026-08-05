@@ -205,6 +205,22 @@ describe('toTimelineItems', () => {
     expect(result[0].repostedBy?.handle).toBe('alice.bsky.social')
   })
 
+  it('同じ投稿を異なる人がリポストした場合、sliceKeyはリポストした人ごとに異なる(dedupeTimelineItemsが同一スライス内でuriが重複するのを防ぐため)', () => {
+    const reposterA = { did: 'did:plc:reposter-a', handle: 'a.bsky.social' }
+    const reposterB = { did: 'did:plc:reposter-b', handle: 'b.bsky.social' }
+    const feedViewPostA = {
+      post: rawPostView,
+      reason: { $type: 'app.bsky.feed.defs#reasonRepost', by: reposterA, indexedAt: '2026-08-01T00:00:02.000Z' },
+    } as never
+    const feedViewPostB = {
+      post: rawPostView,
+      reason: { $type: 'app.bsky.feed.defs#reasonRepost', by: reposterB, indexedAt: '2026-08-01T00:00:03.000Z' },
+    } as never
+    const resultA = toTimelineItems(feedViewPostA)
+    const resultB = toTimelineItems(feedViewPostB)
+    expect(resultA[0].sliceKey).not.toBe(resultB[0].sliceKey)
+  })
+
   it('reasonが無ければrepostedByはundefined', () => {
     const feedViewPost = { post: rawPostView } as never
     expect(toTimelineItems(feedViewPost)[0].repostedBy).toBeUndefined()
@@ -229,7 +245,7 @@ describe('toTimelineItems', () => {
     expect(result[1].connectsToNext).toBeUndefined()
   })
 
-  it('reply.rootとreply.parentが異なる投稿なら、root・parentの両方を独立した項目として先頭に追加し、両方にconnectsToNextを立てる', () => {
+  it('reply.rootとreply.parentが異なる投稿なら、root・parentの両方を独立した項目として先頭に追加し、両方にconnectsToNextを立てる。rootにはisThreadRootを立てる(中間が省略されている旨を示すため)', () => {
     const rootPost = { ...rawPostView, uri: 'at://did:plc:abc/app.bsky.feed.post/root', author: { ...rawAuthor, handle: 'carol.bsky.social' } }
     const parentPost = { ...rawPostView, uri: 'at://did:plc:abc/app.bsky.feed.post/parent', author: { ...rawAuthor, handle: 'bob.bsky.social' } }
     const feedViewPost = {
@@ -244,12 +260,42 @@ describe('toTimelineItems', () => {
     expect(result[0].post.uri).toBe('at://did:plc:abc/app.bsky.feed.post/root')
     expect(result[0].post.author.handle).toBe('carol.bsky.social')
     expect(result[0].connectsToNext).toBe(true)
+    expect(result[0].isThreadRoot).toBe(true)
+    // rootはそのスライスで最も古い投稿(スレッドの起点)なのでisSliceRootが立つ(インデント抑制用)
+    expect(result[0].isSliceRoot).toBe(true)
     expect(result[1].post.uri).toBe('at://did:plc:abc/app.bsky.feed.post/parent')
     expect(result[1].post.author.handle).toBe('bob.bsky.social')
     expect(result[1].connectsToNext).toBe(true)
+    expect(result[1].isThreadRoot).toBeUndefined()
+    // parentはrootではないのでisSliceRootは立たない(文脈表示としてインデントされるべき)
+    expect(result[1].isSliceRoot).toBe(false)
     expect(result[2].post.uri).toBe(rawPostView.uri)
     expect(result[2].replyToHandle).toBe('bob.bsky.social')
     expect(result[2].connectsToNext).toBeUndefined()
+    // 同一feedエントリ由来の全アイテムは同じsliceKey(本体のuri)を持つ
+    expect(result[0].sliceKey).toBe(rawPostView.uri)
+    expect(result[1].sliceKey).toBe(rawPostView.uri)
+    expect(result[2].sliceKey).toBe(rawPostView.uri)
+    // 全アイテムはこのスレッドの起点(reply.root)のuriをrootUriとして持つ
+    expect(result[0].rootUri).toBe('at://did:plc:abc/app.bsky.feed.post/root')
+    expect(result[1].rootUri).toBe('at://did:plc:abc/app.bsky.feed.post/root')
+    expect(result[2].rootUri).toBe('at://did:plc:abc/app.bsky.feed.post/root')
+  })
+
+  it('replyが無ければrootUriは自分自身のuri', () => {
+    const feedViewPost = { post: rawPostView } as never
+    expect(toTimelineItems(feedViewPost)[0].rootUri).toBe(rawPostView.uri)
+  })
+
+  it('reply.rootとreply.parentが同一投稿(1階層のみの返信)なら、parent複製にisThreadRootは立たないが、parent自身がスレッドの起点なのでisSliceRootは立つ', () => {
+    const parentPost = { ...rawPostView, uri: 'at://did:plc:abc/app.bsky.feed.post/parent', author: { ...rawAuthor, handle: 'bob.bsky.social' } }
+    const feedViewPost = {
+      post: rawPostView,
+      reply: { root: parentPost, parent: parentPost },
+    } as never
+    const result = toTimelineItems(feedViewPost)
+    expect(result[0].isThreadRoot).toBeUndefined()
+    expect(result[0].isSliceRoot).toBe(true)
   })
 
   it('reply.rootがblockedPost等(recordなし)でreply.parentが完全な投稿なら、parent複製と本体の2件のみになる', () => {

@@ -53,6 +53,8 @@ export function ProfileScreen({
   const [feedError, setFeedError] = useState<string>()
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const isLoadingMoreRef = useRef(false)
+  // dedupeTimelineItemsのseenUrisをページをまたいで永続化する(TimelineScreenと同じ理由)。
+  const seenUrisRef = useRef<Set<string>>(new Set(initialItems.map((it) => it.post.uri)))
 
   useEffect(() => {
     let cancelled = false
@@ -84,7 +86,8 @@ export function ProfileScreen({
     setIsLoadingMore(true)
     try {
       const page = await fetchAuthorFeed(client, actor, cursor)
-      setItems((prev) => dedupeTimelineItems([...prev, ...page.items]))
+      const deduped = dedupeTimelineItems(page.items, seenUrisRef.current)
+      setItems((prev) => [...prev, ...deduped])
       setCursor(page.cursor)
       setFeedError(undefined)
     } catch {
@@ -219,6 +222,8 @@ export function ProfileScreen({
               repostedByHandle={item.repostedBy?.handle}
               replyToHandle={item.replyToHandle}
               connectsToNext={item.connectsToNext}
+              showThreadHint={item.isThreadRoot}
+              indent={item.connectsToNext && !item.isSliceRoot}
             />
           )}
         />

@@ -11,6 +11,7 @@ import {
   deletePost,
   dedupeTimelineItems,
 } from './client.js'
+import { toTimelineItems } from './format.js'
 import type { AtpClient } from './atp-client.js'
 import type { PostSummary, TimelineItem } from './types.js'
 
@@ -269,12 +270,22 @@ describe('deletePost', () => {
 })
 
 function makeItem(uri: string): TimelineItem {
-  return { post: { ...(likedPost as PostSummary), uri } }
+  return { post: { ...(likedPost as PostSummary), uri }, sliceKey: uri, rootUri: uri }
+}
+
+function makePost(uri: string): TimelineItem['post'] {
+  return { ...(likedPost as PostSummary), uri }
 }
 
 describe('dedupeTimelineItems', () => {
-  it('同じuriの投稿が複数あれば最初の1件だけ残す', () => {
-    const items = [makeItem('at://p/b'), makeItem('at://p/d'), makeItem('at://p/a'), makeItem('at://p/b'), makeItem('at://p/c')]
+  it('異なるスライス(例: 複数人による別々のリポスト)が同じ投稿uriを本体として含む場合、最初の1件だけ残す', () => {
+    const items: TimelineItem[] = [
+      { post: makePost('at://p/b'), sliceKey: 'repost-1', rootUri: 'at://p/b' },
+      { post: makePost('at://p/d'), sliceKey: 'slice-d', rootUri: 'at://p/d' },
+      { post: makePost('at://p/a'), sliceKey: 'slice-a', rootUri: 'at://p/a' },
+      { post: makePost('at://p/b'), sliceKey: 'repost-2', rootUri: 'at://p/b' },
+      { post: makePost('at://p/c'), sliceKey: 'slice-c', rootUri: 'at://p/c' },
+    ]
     const result = dedupeTimelineItems(items)
     expect(result.map((it) => it.post.uri)).toEqual(['at://p/b', 'at://p/d', 'at://p/a', 'at://p/c'])
   })
@@ -284,37 +295,215 @@ describe('dedupeTimelineItems', () => {
     expect(dedupeTimelineItems(items)).toEqual(items)
   })
 
-  it('自己リプライ連鎖(A→B→C)の各フィードエントリがroot/parent複製を伴って流れてきても、各投稿のconnectsToNextとreplyToHandleが失われない', () => {
-    // A(root)←B(Aへの返信)←C(Bへの返信) という自己リプライ連鎖を想定。
-    // フィードは新しい順で流れてくるため、Cのエントリ→Bのエントリ→Aのエントリの順にflatMapされる。
-    const postA: TimelineItem['post'] = { ...(likedPost as PostSummary), uri: 'at://p/a' }
-    const postB: TimelineItem['post'] = { ...(likedPost as PostSummary), uri: 'at://p/b' }
-    const postC: TimelineItem['post'] = { ...(likedPost as PostSummary), uri: 'at://p/c' }
-
-    // Cのフィードエントリ由来: [A(root,connects), B(parent,connects), C本体(replyToHandle)]
-    const fromC: TimelineItem[] = [
-      { post: postA, connectsToNext: true },
-      { post: postB, connectsToNext: true },
-      { post: postC, replyToHandle: 'author-of-b' },
+  it('公式実装のコメント例[A→B→C],[A→D→E],[A→D→F] → [A→B→C],[D→E],[F]をそのまま再現する', () => {
+    const a = makePost('at://p/a')
+    const b = makePost('at://p/b')
+    const c = makePost('at://p/c')
+    const d = makePost('at://p/d')
+    const e = makePost('at://p/e')
+    const f = makePost('at://p/f')
+    const items: TimelineItem[] = [
+      { post: a, connectsToNext: true, sliceKey: 'slice1', rootUri: 'at://p/a' },
+      { post: b, connectsToNext: true, sliceKey: 'slice1', rootUri: 'at://p/a' },
+      { post: c, sliceKey: 'slice1', rootUri: 'at://p/a' },
+      { post: a, connectsToNext: true, sliceKey: 'slice2', rootUri: 'at://p/a' },
+      { post: d, connectsToNext: true, sliceKey: 'slice2', rootUri: 'at://p/a' },
+      { post: e, sliceKey: 'slice2', rootUri: 'at://p/a' },
+      { post: a, connectsToNext: true, sliceKey: 'slice3', rootUri: 'at://p/a' },
+      { post: d, connectsToNext: true, sliceKey: 'slice3', rootUri: 'at://p/a' },
+      { post: f, sliceKey: 'slice3', rootUri: 'at://p/a' },
     ]
-    // Bのフィードエントリ由来: [A(parent,connects)=root===parentなので1件のみ, B本体(replyToHandle)]
-    const fromB: TimelineItem[] = [
-      { post: postA, connectsToNext: true },
-      { post: postB, replyToHandle: 'author-of-a' },
-    ]
-    // Aのフィードエントリ由来(reply無し): [A本体]
-    const fromA: TimelineItem[] = [{ post: postA }]
+    const result = dedupeTimelineItems(items)
+    expect(result.map((it) => it.post.uri)).toEqual(['at://p/a', 'at://p/b', 'at://p/c', 'at://p/d', 'at://p/e', 'at://p/f'])
+  })
 
-    const merged = [...fromC, ...fromB, ...fromA]
-    const result = dedupeTimelineItems(merged)
+  it('スライスの先頭(root)が既知なら、そのアイテムだけ剥がして残りは表示する', () => {
+    const a = makePost('at://p/a')
+    const b = makePost('at://p/b')
+    const c = makePost('at://p/c')
+    const items: TimelineItem[] = [
+      { post: a, sliceKey: 'slice1', rootUri: 'at://p/a' },
+      { post: a, connectsToNext: true, sliceKey: 'slice2', rootUri: 'at://p/a' },
+      { post: b, connectsToNext: true, sliceKey: 'slice2', rootUri: 'at://p/a' },
+      { post: c, sliceKey: 'slice2', rootUri: 'at://p/a' },
+    ]
+    const result = dedupeTimelineItems(items)
+    // Aは既に表示済みなので、2番目のスライスからはAが剥がれてB,Cだけが残る
+    expect(result.map((it) => it.post.uri)).toEqual(['at://p/a', 'at://p/b', 'at://p/c'])
+  })
+
+  it('スライスの最後(本体)が既知なら、スライス全体を破棄する(自己リプライ連鎖でBが単独浮遊表示されるバグの再現・修正確認)', () => {
+    // A(root)←B(Aへの返信)←C(Bへの返信)←D(Cへの返信) という4段の自己リプライ連鎖。
+    // フィードは新しい順で流れてくるため、D→C→B→Aのフィードエントリ順にitemsが並ぶ。
+    const a = makePost('at://p/a')
+    const b = makePost('at://p/b')
+    const c = makePost('at://p/c')
+    const d = makePost('at://p/d')
+    const items: TimelineItem[] = [
+      // Dのフィードエントリ: root=A, parent=C(root!==parent)
+      { post: a, connectsToNext: true, isThreadRoot: true, sliceKey: 'd', rootUri: 'at://p/a' },
+      { post: c, connectsToNext: true, sliceKey: 'd', rootUri: 'at://p/a' },
+      { post: d, replyToHandle: 'author-of-c', sliceKey: 'd', rootUri: 'at://p/a' },
+      // Cのフィードエントリ: root=A, parent=B(root!==parent)
+      { post: a, connectsToNext: true, isThreadRoot: true, sliceKey: 'c', rootUri: 'at://p/a' },
+      { post: b, connectsToNext: true, sliceKey: 'c', rootUri: 'at://p/a' },
+      { post: c, replyToHandle: 'author-of-b', sliceKey: 'c', rootUri: 'at://p/a' },
+      // Bのフィードエントリ: root=A, parent=A(同一)
+      { post: a, connectsToNext: true, sliceKey: 'b', rootUri: 'at://p/a' },
+      { post: b, replyToHandle: 'author-of-a', sliceKey: 'b', rootUri: 'at://p/a' },
+      // Aのフィードエントリ(reply無し)
+      { post: a, sliceKey: 'a', rootUri: 'at://p/a' },
+    ]
+    const result = dedupeTimelineItems(items)
+    // Dのスライス[A,C,D]がそのまま表示される。Cのスライス[A,B,C]はA,Cが既知なので
+    // 先頭Aが剥がれ[B,C]になるが、最後のCも既知なのでスライス全体が破棄される(Bも表示されない)。
+    // Bのスライス[A,B]も同様にAが剥がれ[B]になるが、Bは既にCのスライス破棄時にseenUris扱いにならないため
+    // 実際には表示されうる。以降のAのスライスはAが既知なので破棄される。
+    expect(result.map((it) => it.post.uri)).toEqual(['at://p/a', 'at://p/c', 'at://p/d'])
+    // Bが離れた位置に単独浮遊表示されることはない(今回のバグの再発防止)
+    expect(result.some((it) => it.post.uri === 'at://p/b')).toBe(false)
+  })
+
+  it('seenUrisを呼び出し間で永続化すると、ページをまたいでスライスが破棄された投稿(X)が後続ページで単独浮遊表示されない', () => {
+    // 実際に発生したケース(A→X→B→C、4段連鎖)を再現。
+    // ページ1にfeed(C)とfeed(B)、ページ2にfeed(X)とfeed(A)が含まれる状況を想定。
+    const a = makePost('at://p/a')
+    const b = makePost('at://p/b')
+    const c = makePost('at://p/c')
+    const x = makePost('at://p/x')
+    const page1: TimelineItem[] = [
+      // feed(C): root=A, parent=B(root!==parent)
+      { post: a, connectsToNext: true, isThreadRoot: true, sliceKey: 'c', rootUri: 'at://p/a' },
+      { post: b, connectsToNext: true, sliceKey: 'c', rootUri: 'at://p/a' },
+      { post: c, replyToHandle: 'author-of-b', sliceKey: 'c', rootUri: 'at://p/a' },
+      // feed(B): root=A, parent=X(root!==parent)
+      { post: a, connectsToNext: true, isThreadRoot: true, sliceKey: 'b', rootUri: 'at://p/a' },
+      { post: x, connectsToNext: true, sliceKey: 'b', rootUri: 'at://p/a' },
+      { post: b, replyToHandle: 'author-of-x', sliceKey: 'b', rootUri: 'at://p/a' },
+    ]
+    const page2: TimelineItem[] = [
+      // feed(X): root=A, parent=A(同一)
+      { post: a, connectsToNext: true, sliceKey: 'x', rootUri: 'at://p/a' },
+      { post: x, replyToHandle: 'author-of-a', sliceKey: 'x', rootUri: 'at://p/a' },
+      // feed(A)(reply無し)
+      { post: a, sliceKey: 'a', rootUri: 'at://p/a' },
+    ]
+
+    const seenUris = new Set<string>()
+    const result1 = dedupeTimelineItems(page1, seenUris)
+    const result2 = dedupeTimelineItems(page2, seenUris)
+    const combined = [...result1, ...result2]
+
+    expect(combined.map((it) => it.post.uri)).toEqual(['at://p/a', 'at://p/b', 'at://p/c'])
+    // Xがページをまたいで単独浮遊表示されることはない
+    expect(combined.some((it) => it.post.uri === 'at://p/x')).toBe(false)
+  })
+
+  it('(退行確認) seenUrisを永続化せず毎回新規に呼ぶと、ページをまたいだ投稿(X)が単独浮遊表示されてしまう', () => {
+    const a = makePost('at://p/a')
+    const b = makePost('at://p/b')
+    const c = makePost('at://p/c')
+    const x = makePost('at://p/x')
+    const page1: TimelineItem[] = [
+      { post: a, connectsToNext: true, isThreadRoot: true, sliceKey: 'c', rootUri: 'at://p/a' },
+      { post: b, connectsToNext: true, sliceKey: 'c', rootUri: 'at://p/a' },
+      { post: c, replyToHandle: 'author-of-b', sliceKey: 'c', rootUri: 'at://p/a' },
+      { post: a, connectsToNext: true, isThreadRoot: true, sliceKey: 'b', rootUri: 'at://p/a' },
+      { post: x, connectsToNext: true, sliceKey: 'b', rootUri: 'at://p/a' },
+      { post: b, replyToHandle: 'author-of-x', sliceKey: 'b', rootUri: 'at://p/a' },
+    ]
+    const page2: TimelineItem[] = [
+      { post: a, connectsToNext: true, sliceKey: 'x', rootUri: 'at://p/a' },
+      { post: x, replyToHandle: 'author-of-a', sliceKey: 'x', rootUri: 'at://p/a' },
+      { post: a, sliceKey: 'a', rootUri: 'at://p/a' },
+    ]
+
+    // TimelineScreenの旧実装(setItems((prev) => dedupeTimelineItems([...prev, ...page.items])))を模して、
+    // prev(既にdedupe済みの結果)とpage2を結合してから再度dedupeし直すとどうなるか
+    const prev = dedupeTimelineItems(page1)
+    const merged = dedupeTimelineItems([...prev, ...page2])
+
+    // Xが単独浮遊表示されてしまう(これが今回発見されたバグの再現)
+    expect(merged.some((it) => it.post.uri === 'at://p/x')).toBe(true)
+  })
+
+  it('seenRootUrisを渡すと、同じスレッド(rootUri)から2件目以降のスライスはpost単位判定に進む前に丸ごと破棄される(公式実装のdedupThreads相当)', () => {
+    // 実際に発生したケース: A(root)←X←B←C という4段の自己リプライ連鎖。
+    // Cのスライス([A,B,C])が最初に表示された時点でrootUri=Aがseenになり、
+    // 以降Aと同じスレッドのX単独のスライス([A,X])もpost単位のseenUris判定に進む前に破棄される。
+    const a = makePost('at://p/a')
+    const b = makePost('at://p/b')
+    const c = makePost('at://p/c')
+    const x = makePost('at://p/x')
+    const items: TimelineItem[] = [
+      // feed(C): root=A, parent=B(root!==parent)
+      { post: a, connectsToNext: true, isThreadRoot: true, sliceKey: 'c', rootUri: 'at://p/a' },
+      { post: b, connectsToNext: true, sliceKey: 'c', rootUri: 'at://p/a' },
+      { post: c, replyToHandle: 'author-of-b', sliceKey: 'c', rootUri: 'at://p/a' },
+      // feed(X): root=A, parent=A(同一)。C由来のスライスとは別に、Xが単独で流れてくる想定
+      { post: a, connectsToNext: true, sliceKey: 'x', rootUri: 'at://p/a' },
+      { post: x, replyToHandle: 'author-of-a', sliceKey: 'x', rootUri: 'at://p/a' },
+      // feed(A)(reply無し)
+      { post: a, sliceKey: 'a', rootUri: 'at://p/a' },
+    ]
+    const seenRootUris = new Set<string>()
+    const result = dedupeTimelineItems(items, new Set(), seenRootUris)
 
     expect(result.map((it) => it.post.uri)).toEqual(['at://p/a', 'at://p/b', 'at://p/c'])
-    // Aは複製(connectsToNext)のまま表示位置を保持しつつ、独立投稿としての情報(replyToHandle無し)を維持する
-    expect(result[0]?.connectsToNext).toBe(true)
-    // Bはconnects複製とreplyToHandle付き本体の両方の情報を失わない: 罫線接続(connectsToNext)と返信元表示(replyToHandle)の両方が保持される
-    expect(result[1]?.connectsToNext).toBe(true)
-    expect(result[1]?.replyToHandle).toBe('author-of-a')
-    // Cは本体のみなのでreplyToHandleを維持する
-    expect(result[2]?.replyToHandle).toBe('author-of-b')
+    // Xはスレッド単位のdedupeで完全に非表示になる(post単位のreplyToHandleが付いていても関係ない)
+    expect(result.some((it) => it.post.uri === 'at://p/x')).toBe(false)
+    expect(seenRootUris.has('at://p/a')).toBe(true)
+  })
+
+  it('seenRootUrisを渡しても、リポストのスライスはスレッド単位dedupeの対象外(常に表示される)', () => {
+    const a = makePost('at://p/a')
+    const c = makePost('at://p/c')
+    const items: TimelineItem[] = [
+      { post: c, sliceKey: 'c', rootUri: 'at://p/a' },
+      // 同じrootUri(=a)を持つ別スレッドの投稿だが、これはリポストなのでスレッド単位dedupeの対象外
+      { post: a, repostedBy: { did: 'did:plc:x', handle: 'reposter.bsky.social' }, sliceKey: 'a-repost', rootUri: 'at://p/a' },
+    ]
+    const result = dedupeTimelineItems(items, new Set(), new Set())
+    expect(result.map((it) => it.post.uri)).toEqual(['at://p/c', 'at://p/a'])
+  })
+
+  it('seenRootUrisを渡さなければ、従来通りpost単位のdedupeのみが行われる(著者フィード等での後方互換)', () => {
+    const a = makePost('at://p/a')
+    const b = makePost('at://p/b')
+    const c = makePost('at://p/c')
+    const x = makePost('at://p/x')
+    const items: TimelineItem[] = [
+      { post: a, connectsToNext: true, isThreadRoot: true, sliceKey: 'c', rootUri: 'at://p/a' },
+      { post: b, connectsToNext: true, sliceKey: 'c', rootUri: 'at://p/a' },
+      { post: c, replyToHandle: 'author-of-b', sliceKey: 'c', rootUri: 'at://p/a' },
+      { post: a, connectsToNext: true, sliceKey: 'x', rootUri: 'at://p/a' },
+      { post: x, replyToHandle: 'author-of-a', sliceKey: 'x', rootUri: 'at://p/a' },
+    ]
+    const result = dedupeTimelineItems(items)
+    // seenRootUris省略時は、Xの本体は「先頭Aだけ剥がされ、Xは初見なのでそのまま表示される」という
+    // post単位dedupeの挙動になる(著者フィードでは全投稿を見せたいため、スレッド単位dedupeは行わない)
+    expect(result.map((it) => it.post.uri)).toEqual(['at://p/a', 'at://p/b', 'at://p/c', 'at://p/x'])
+  })
+
+  it('(統合) 同じ投稿が複数人にリポストされてタイムラインに流れてきても、toTimelineItems→dedupeTimelineItemsを通すと1件だけ表示される', () => {
+    const target = { ...rawPost, uri: 'at://p/target' }
+    const reposterA = { did: 'did:plc:reposter-a', handle: 'a.bsky.social' }
+    const reposterB = { did: 'did:plc:reposter-b', handle: 'b.bsky.social' }
+    const feedFromA = toTimelineItems({
+      post: target,
+      reason: { $type: 'app.bsky.feed.defs#reasonRepost', by: reposterA, indexedAt: '2026-08-01T00:00:02.000Z' },
+    } as never)
+    const feedFromB = toTimelineItems({
+      post: target,
+      reason: { $type: 'app.bsky.feed.defs#reasonRepost', by: reposterB, indexedAt: '2026-08-01T00:00:03.000Z' },
+    } as never)
+
+    const merged = [...feedFromB, ...feedFromA] // フィードは新しい順(Bのリポストが後、つまり新しい)なので先に来る
+    const result = dedupeTimelineItems(merged, new Set(), new Set())
+
+    expect(result).toHaveLength(1)
+    expect(result[0]?.post.uri).toBe('at://p/target')
+    // 先に流れてきた(=より新しい)Bのリポストの表記が残る
+    expect(result[0]?.repostedBy?.handle).toBe('b.bsky.social')
   })
 })

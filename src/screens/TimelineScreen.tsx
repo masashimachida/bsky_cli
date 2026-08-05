@@ -44,6 +44,13 @@ export function TimelineScreen({
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const isLoadingMoreRef = useRef(false)
   const [confirmDeleteTarget, setConfirmDeleteTarget] = useState<PostSummary | null>(null)
+  // dedupeTimelineItemsのseenUris/seenRootUrisをページをまたいで永続化する
+  // (公式実装のFeedTunerインスタンスと同じ理由)。毎回新規Setで全アイテムを再dedupeすると、
+  // 既に破棄されたスライスの投稿が後続ページで「初見」扱いになり単独浮遊表示されてしまう。
+  const seenUrisRef = useRef<Set<string>>(new Set(initialItems.map((it) => it.post.uri)))
+  const seenRootUrisRef = useRef<Set<string>>(
+    new Set(initialItems.filter((it) => it.repostedBy === undefined).map((it) => it.rootUri)),
+  )
 
   const loadMore = useCallback(async () => {
     if (isLoadingMoreRef.current) return
@@ -51,7 +58,8 @@ export function TimelineScreen({
     setIsLoadingMore(true)
     try {
       const page = await fetchTimeline(client, cursor)
-      setItems((prev) => dedupeTimelineItems([...prev, ...page.items]))
+      const deduped = dedupeTimelineItems(page.items, seenUrisRef.current, seenRootUrisRef.current)
+      setItems((prev) => [...prev, ...deduped])
       setCursor(page.cursor)
       setError(undefined)
     } catch {
@@ -71,7 +79,9 @@ export function TimelineScreen({
     const currentUri = items[index]?.post.uri
     try {
       const page = await fetchTimeline(client, undefined)
-      const newItems = dedupeTimelineItems(page.items)
+      seenUrisRef.current = new Set()
+      seenRootUrisRef.current = new Set()
+      const newItems = dedupeTimelineItems(page.items, seenUrisRef.current, seenRootUrisRef.current)
       setItems(newItems)
       setCursor(page.cursor)
       const newIndex = currentUri ? newItems.findIndex((it) => it.post.uri === currentUri) : -1
@@ -226,6 +236,8 @@ export function TimelineScreen({
             repostedByHandle={item.repostedBy?.handle}
             replyToHandle={item.replyToHandle}
             connectsToNext={item.connectsToNext}
+            showThreadHint={item.isThreadRoot}
+            indent={item.connectsToNext && !item.isSliceRoot}
           />
         )}
       />

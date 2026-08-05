@@ -193,18 +193,26 @@ export function toTimelineItems(feedViewPost: RawFeedViewPost): TimelineItem[] {
   const repostedBy =
     reason?.$type === 'app.bsky.feed.defs#reasonRepost' ? toAuthor((reason as RawReasonRepost).by) : undefined
 
-  const items: TimelineItem[] = []
+  // sliceKeyは通常post自身のuriだが、リポストの場合は投稿者の異なる複数人が同じ投稿を
+  // リポストしうるため、リポストした人のdidも含めて別スライスとして扱う必要がある。
+  // これをpost.uriだけにすると、複数人のリポストが1つのスライス内に同一uriのアイテムとして
+  // 積み重なり、dedupeTimelineItemsの先頭からの重複除去ロジックが機能せず全件表示されてしまう。
+  const sliceKey = repostedBy ? `${feedViewPost.post.uri}#repost-${repostedBy.did}` : feedViewPost.post.uri
   const root = feedViewPost.reply?.root
+  const rootUri = root && isRawPostView(root) ? root.uri : feedViewPost.post.uri
+  const items: TimelineItem[] = []
   const parent = feedViewPost.reply?.parent
   let replyToHandle: string | undefined
 
   if (parent) {
     if (!repostedBy) {
+      let hasSeparateRoot = false
       if (root && isRawPostView(root) && root.uri !== parent.uri) {
-        items.push({ post: toPostSummary(root), connectsToNext: true })
+        hasSeparateRoot = true
+        items.push({ post: toPostSummary(root), connectsToNext: true, isThreadRoot: true, isSliceRoot: true, sliceKey, rootUri })
       }
       if (isRawPostView(parent)) {
-        items.push({ post: toPostSummary(parent), connectsToNext: true })
+        items.push({ post: toPostSummary(parent), connectsToNext: true, isSliceRoot: !hasSeparateRoot, sliceKey, rootUri })
       }
     }
     replyToHandle = isRawPostView(parent) ? parent.author.handle : parent.author?.handle
@@ -214,6 +222,8 @@ export function toTimelineItems(feedViewPost: RawFeedViewPost): TimelineItem[] {
     post: toPostSummary(feedViewPost.post),
     repostedBy,
     replyToHandle,
+    sliceKey,
+    rootUri,
   })
   return items
 }

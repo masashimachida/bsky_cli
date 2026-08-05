@@ -12,6 +12,7 @@ export function PostItem({
   replyToHandle,
   connectsToNext,
   indent,
+  showThreadHint,
 }: {
   post: PostSummary
   selected: boolean
@@ -20,6 +21,7 @@ export function PostItem({
   replyToHandle?: string
   connectsToNext?: boolean
   indent?: boolean
+  showThreadHint?: boolean
 }) {
   return (
     <Box
@@ -75,6 +77,7 @@ export function PostItem({
           <Text color={post.viewerRepostUri ? 'green' : undefined}>↻ {post.repostCount}</Text>
           <Text>↩ {post.replyCount}</Text>
         </Box>
+        {showThreadHint && <Text color="#666666">…完全なスレッドを見るにはEnter</Text>}
       </Box>
     </Box>
   )

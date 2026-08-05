@@ -43,32 +43,65 @@ export async function fetchAuthorFeed(client: AtpClient, actor: string, cursor?:
   return { items: res.data.feed.flatMap((f) => toTimelineItems(f as never)), cursor: res.data.cursor }
 }
 
-// 返信先の複製(connectsToNextのみのプレースホルダ)と、同じ投稿が別のfeedエントリで
-// 本体(replyToHandle付き)として登場したものが重複する場合、両方の情報をマージする。
-// 表示位置は最初に登場した位置を採用する。
-export function dedupeTimelineItems(items: TimelineItem[]): TimelineItem[] {
-  const mergedByUri = new Map<string, TimelineItem>()
+// Bluesky公式Web版(bluesky-social/social-app, src/lib/api/feed-manip.ts の FeedTuner.tune)の
+// ロジックを移植。各feedエントリ由来のアイテム群を「スライス」(sliceKeyでグループ化、root?→parent?→本体の
+// 1〜3件、常に古い→新しい順)として扱い、スライス単位で重複解決する:
+// - スライス先頭のアイテムが既に別のスライスで表示済み(seenUris)なら、そのアイテムを剥がして次へ進む
+//   例: [A→B→C], [A→D→E], [A→D→F] → [A→B→C], [D→E], [F]
+// - 剥がした結果、最後のアイテム(本体)まで既に表示済みなら、スライス全体を破棄する
+//   (中間の投稿を失うことになるが、ユーザーはスレッド画面で全体を見られる)
+// スライス内の順序は常に維持されるため、post単位でグローバルにマージする旧方式と違い、
+// 位置がずれて誤った罫線接続が生じることがない。
+//
+// seenUrisは呼び出し元(TimelineScreen等)がページをまたいで永続化して渡すことを想定している
+// (公式実装のFeedTunerインスタンスがseenUrisを保持し続けるのと同じ理由)。ページ単位で
+// 都度新しいSetを作って呼び出すと、既に表示済みのスライスの先頭(root)だけが別ページの
+// 「既知」として剥がされ、残りの中間投稿が単独で浮遊表示されてしまう。
+//
+// seenRootUrisを渡すと、公式実装のFeedTuner.dedupThreadsと同じ「スレッド単位」の重複排除も行う:
+// 同じスレッド(reply.root)から2件目以降のフィードエントリが来たら、そのスライスをpost単位の
+// 判定に進む前に丸ごと破棄する(リポストは対象外)。これにより、自己リプライ連鎖の中間投稿が
+// 離れた位置に単独浮遊表示される問題が根本的に解消される — Followingタイムラインは「1スレッドにつき
+// 最新の反応だけを見せる」設計なので、その仕様に合わせている。公式のコメント通り、著者フィードなど
+// 「その人の投稿を全部見せたい」場面ではこの引数を渡さないこと。
+export function dedupeTimelineItems(items: TimelineItem[], seenUris: Set<string> = new Set(), seenRootUris?: Set<string>): TimelineItem[] {
+  const sliceOrder: string[] = []
+  const slices = new Map<string, TimelineItem[]>()
   for (const item of items) {
-    const existing = mergedByUri.get(item.post.uri)
-    if (!existing) {
-      mergedByUri.set(item.post.uri, item)
-      continue
+    let slice = slices.get(item.sliceKey)
+    if (!slice) {
+      slice = []
+      slices.set(item.sliceKey, slice)
+      sliceOrder.push(item.sliceKey)
     }
-    mergedByUri.set(item.post.uri, {
-      ...item,
-      ...existing,
-      post: existing.post,
-      connectsToNext: existing.connectsToNext,
-      replyToHandle: existing.replyToHandle ?? item.replyToHandle,
-      repostedBy: existing.repostedBy ?? item.repostedBy,
-    })
+    slice.push(item)
   }
-  const seen = new Set<string>()
+
   const result: TimelineItem[] = []
-  for (const item of items) {
-    if (seen.has(item.post.uri)) continue
-    seen.add(item.post.uri)
-    result.push(mergedByUri.get(item.post.uri)!)
+  for (const sliceKey of sliceOrder) {
+    let sliceItems = slices.get(sliceKey)!
+
+    if (seenRootUris) {
+      const rootUri = sliceItems[0].rootUri
+      const isRepost = sliceItems.some((it) => it.repostedBy !== undefined)
+      if (!isRepost) {
+        if (seenRootUris.has(rootUri)) continue
+        seenRootUris.add(rootUri)
+      }
+    }
+
+    while (sliceItems.length > 0 && seenUris.has(sliceItems[0].post.uri)) {
+      sliceItems = sliceItems.slice(1)
+    }
+    if (sliceItems.length === 0) continue
+    // 破棄されるスライスでも、未知だったアイテムはseenUrisに記録する(公式実装と同じ挙動)。
+    // これにより、破棄された投稿が後続のスライス先頭に再登場した場合も正しく剥がされる。
+    const isLastKnown = seenUris.has(sliceItems[sliceItems.length - 1].post.uri)
+    for (const item of sliceItems) {
+      seenUris.add(item.post.uri)
+    }
+    if (isLastKnown) continue
+    result.push(...sliceItems)
   }
   return result
 }
