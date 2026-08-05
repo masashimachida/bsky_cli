@@ -11,6 +11,7 @@ import { ComposeScreen } from './screens/ComposeScreen.js'
 import { NotificationsScreen } from './screens/NotificationsScreen.js'
 import { ProfileScreen } from './screens/ProfileScreen.js'
 import { HelpOverlay } from './components/HelpOverlay.js'
+import { ConfirmDialog } from './components/ConfirmDialog.js'
 import { HeaderBar } from './components/HeaderBar.js'
 import { getHeaderLabel } from './navigation/header-label.js'
 import { fetchUnreadCount } from './api/client.js'
@@ -44,6 +45,7 @@ export function App() {
     index: number
   } | null>(null)
   const [showHelp, setShowHelp] = useState(false)
+  const [confirmQuit, setConfirmQuit] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
 
   const store = useMemo(() => createKeychainSessionStore(), [])
@@ -123,16 +125,29 @@ export function App() {
 
   useInput(
     (input) => {
-      if (input === 'q') exit()
+      if (input === 'q') setConfirmQuit(true)
     },
-    { isActive: !showHelp && (top.name === 'timeline' || top.name === 'notifications') },
+    { isActive: !showHelp && top.name !== 'login' && top.name !== 'compose' && !confirmQuit },
+  )
+
+  useInput(
+    (input, key) => {
+      if (input === 'y') {
+        exit()
+        return
+      }
+      if (input === 'n' || key.escape) {
+        setConfirmQuit(false)
+      }
+    },
+    { isActive: confirmQuit },
   )
 
   useInput(
     (input) => {
       if (input === '?') setShowHelp(true)
     },
-    { isActive: !showHelp && top.name !== 'login' && top.name !== 'compose' },
+    { isActive: !showHelp && top.name !== 'login' && top.name !== 'compose' && !confirmQuit },
   )
 
   useInput(
@@ -199,7 +214,7 @@ export function App() {
         openProfile()
       }
     },
-    { isActive: !showHelp && top.name !== 'login' && top.name !== 'compose' },
+    { isActive: !showHelp && top.name !== 'login' && top.name !== 'compose' && !confirmQuit },
   )
 
   return (
@@ -220,7 +235,7 @@ export function App() {
             {client && top.name === 'timeline' && (
               <TimelineScreen
                 client={client}
-                active={true}
+                active={!confirmQuit}
                 initialItems={timelineState.items}
                 initialCursor={timelineState.cursor}
                 initialIndex={timelineState.index}
@@ -234,7 +249,7 @@ export function App() {
             {client && top.name === 'notifications' && (
               <NotificationsScreen
                 client={client}
-                active={true}
+                active={!confirmQuit}
                 initialItems={notificationsState.items}
                 initialCursor={notificationsState.cursor}
                 initialIndex={notificationsState.index}
@@ -247,7 +262,7 @@ export function App() {
               <ThreadScreen
                 client={client}
                 uri={top.uri}
-                active={true}
+                active={!confirmQuit}
                 initialPosts={threadState?.uri === top.uri ? threadState.posts : []}
                 initialIndex={threadState?.uri === top.uri ? threadState.index : 0}
                 onStateChange={(posts, index) => setThreadState({ uri: top.uri, posts, index })}
@@ -263,7 +278,7 @@ export function App() {
               <ProfileScreen
                 client={client}
                 actor={top.actor}
-                active={true}
+                active={!confirmQuit}
                 onBack={pop}
                 onOpenThread={openThread}
                 onReply={(post) => openCompose(post)}
@@ -273,6 +288,7 @@ export function App() {
                 onStateChange={(state) => setProfileState({ actor: top.actor, ...state })}
               />
             )}
+            {confirmQuit && <ConfirmDialog message="終了しますか?" confirmLabel="y: 終了" cancelLabel="n: キャンセル" />}
           </>
         )}
       </Box>
