@@ -1,13 +1,16 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Box, Text, useInput } from 'ink'
+import open from 'open'
 import { PostItem } from '../components/PostItem.js'
 import { StatusBar } from '../components/StatusBar.js'
+import { ConfirmDialog } from '../components/ConfirmDialog.js'
 import { ScrollingViewport, OVERHEAD_ROWS } from '../components/ScrollingViewport.js'
-import { fetchNotifications } from '../api/client.js'
+import { fetchNotifications, toggleRepost } from '../api/client.js'
 import { resolveListNavigation } from '../keymap/vim-list-keymap.js'
 import { resolveGlobalAction } from '../keymap/global-keymap.js'
-import { formatRelativeTime } from '../api/format.js'
+import { formatRelativeTime, postWebUrl } from '../api/format.js'
 import { useTerminalRows } from '../navigation/useTerminalRows.js'
+import type { ConfirmAction } from './confirm-action.js'
 import type { AtpClient } from '../api/atp-client.js'
 import type { NotificationItem } from '../api/types.js'
 
@@ -47,6 +50,7 @@ export function NotificationsScreen({
   const [error, setError] = useState<string>()
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const isLoadingMoreRef = useRef(false)
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
 
   const loadMore = useCallback(async () => {
     if (isLoadingMoreRef.current) return
@@ -148,8 +152,43 @@ export function NotificationsScreen({
         const current = items[index]
         if (current) onOpenProfile(current.author.did)
       }
+      if (action === 'open-link') {
+        const current = items[index]
+        if (current?.subjectPost) open(postWebUrl(current.subjectPost)).catch(() => {})
+      }
+      if (action === 'repost') {
+        const current = items[index]
+        if (current?.subjectPost) setConfirmAction({ type: 'repost', post: current.subjectPost })
+      }
     },
-    { isActive: active },
+    { isActive: active && !confirmAction },
+  )
+
+  useInput(
+    (input, key) => {
+      if (input === 'y') {
+        const action = confirmAction
+        if (!action) return
+        setConfirmAction(null)
+        toggleRepost(client, action.post)
+          .then((patch) => {
+            setItems((prev) =>
+              prev.map((it) =>
+                it.subjectPost && it.subjectPost.uri === action.post.uri ? { ...it, subjectPost: { ...it.subjectPost, ...patch } } : it,
+              ),
+            )
+            setError(undefined)
+          })
+          .catch(() => {
+            setError('リポストに失敗しました')
+          })
+        return
+      }
+      if (input === 'n' || key.escape) {
+        setConfirmAction(null)
+      }
+    },
+    { isActive: active && !!confirmAction },
   )
 
   const rows = useTerminalRows()
@@ -229,6 +268,12 @@ export function NotificationsScreen({
         }}
       />
       <StatusBar hint=" " status={isLoadingMore ? '読み込み中...' : undefined} error={error} />
+      {confirmAction?.type === 'repost' && (
+        <ConfirmDialog
+          message="この投稿をリポストしますか?"
+          confirmLabel={confirmAction.post.viewerRepostUri ? 'y: リポスト解除' : 'y: リポスト'}
+        />
+      )}
     </Box>
   )
 }
