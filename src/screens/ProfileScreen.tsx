@@ -211,7 +211,7 @@ export function ProfileScreen({
 
   if (profileError) {
     return (
-      <Box flexDirection="column">
+      <Box flexDirection="column" height={rows}>
         <StatusBar hint=" " error={profileError} />
         {confirmAction?.type === 'repost' && (
           <ConfirmDialog
@@ -224,7 +224,7 @@ export function ProfileScreen({
   }
   if (!profile) {
     return (
-      <Box flexDirection="column">
+      <Box flexDirection="column" height={rows}>
         <StatusBar hint=" " status="読み込み中..." />
         {confirmAction?.type === 'repost' && (
           <ConfirmDialog
