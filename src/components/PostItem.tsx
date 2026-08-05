@@ -87,7 +87,11 @@ export function PostItem({
           <Text color={post.viewerRepostUri ? 'green' : undefined}>↻ {post.repostCount}</Text>
           <Text>↩ {post.replyCount}</Text>
         </Box>
-        {showThreadHint && <Text color="#666666">…完全なスレッドを見るにはEnter</Text>}
+        {showThreadHint && (
+          <Box paddingLeft={3}>
+            <Text color="#666666">スレッドをすべて表示</Text>
+          </Box>
+        )}
       </Box>
     </Box>
   )
