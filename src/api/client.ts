@@ -1,6 +1,6 @@
 import type { AtpClient } from './atp-client.js'
 import { toNotificationItem, toPostSummary, toTimelineItems } from './format.js'
-import type { NotificationItem, PostSummary, TimelineItem } from './types.js'
+import type { FeedInfo, NotificationItem, PostSummary, TimelineItem } from './types.js'
 
 const GET_POSTS_CHUNK_SIZE = 25
 
@@ -41,6 +41,34 @@ export async function fetchTimeline(client: AtpClient, cursor?: string): Promise
 export async function fetchAuthorFeed(client: AtpClient, actor: string, cursor?: string): Promise<Page<TimelineItem>> {
   const res = await client.getAuthorFeed({ actor, cursor, limit: PAGE_SIZE })
   return { items: res.data.feed.flatMap((f) => toTimelineItems(f as never)), cursor: res.data.cursor }
+}
+
+export async function fetchFeed(client: AtpClient, feedUri: string, cursor?: string): Promise<Page<TimelineItem>> {
+  const res = await client.app.bsky.feed.getFeed({ feed: feedUri, cursor, limit: PAGE_SIZE })
+  return { items: res.data.feed.flatMap((f) => toTimelineItems(f as never)), cursor: res.data.cursor }
+}
+
+export async function fetchSavedFeeds(client: AtpClient): Promise<FeedInfo[]> {
+  const prefs = await client.getPreferences()
+  const feedSaves = prefs.savedFeeds.filter((f) => f.type === 'feed')
+  if (feedSaves.length === 0) return []
+  const uris = feedSaves.map((f) => f.value)
+  const res = await client.app.bsky.feed.getFeedGenerators({ feeds: uris })
+  const byUri = new Map(res.data.feeds.map((g) => [g.uri, g]))
+  return feedSaves.flatMap((f) => {
+    const generator = byUri.get(f.value)
+    if (!generator) return []
+    return [
+      {
+        uri: generator.uri,
+        displayName: generator.displayName,
+        description: generator.description,
+        pinned: f.pinned,
+        creatorHandle: generator.creator.handle,
+        creatorDisplayName: generator.creator.displayName,
+      },
+    ]
+  })
 }
 
 // Bluesky公式Web版(bluesky-social/social-app, src/lib/api/feed-manip.ts の FeedTuner.tune)の

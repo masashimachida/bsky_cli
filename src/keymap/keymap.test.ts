@@ -44,7 +44,7 @@ describe('resolveGlobalAction', () => {
     ['h', 'back'],
     ['1', 'switch-timeline'],
     ['2', 'switch-notifications'],
-    ['3', 'switch-search'],
+    ['3', 'switch-feeds'],
     ['4', 'switch-profile'],
     ['f', 'like'],
     ['R', 'repost'],

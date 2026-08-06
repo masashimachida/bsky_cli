@@ -31,8 +31,12 @@ describe('getHeaderLabel', () => {
     ).toBe('Reply')
   })
 
-  it('searchはSearch', () => {
-    expect(getHeaderLabel({ name: 'search' })).toBe('Search')
+  it('feed-listはFeeds', () => {
+    expect(getHeaderLabel({ name: 'feed-list' })).toBe('Feeds')
+  })
+
+  it('feedはdisplayNameそのもの', () => {
+    expect(getHeaderLabel({ name: 'feed', uri: 'at://x', displayName: 'カスタムフィードA' })).toBe('カスタムフィードA')
   })
 
   it('image-viewはImage', () => {

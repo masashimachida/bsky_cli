@@ -22,7 +22,7 @@ export type GlobalAction =
   | 'open-thread'
   | 'switch-timeline'
   | 'switch-notifications'
-  | 'switch-search'
+  | 'switch-feeds'
   | 'switch-profile'
   | 'like'
   | 'repost'

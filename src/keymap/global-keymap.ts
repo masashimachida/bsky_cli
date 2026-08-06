@@ -7,7 +7,7 @@ export function resolveGlobalAction(input: string, key: InkKey): GlobalAction | 
   if (key.return) return 'open-thread'
   if (input === '1') return 'switch-timeline'
   if (input === '2') return 'switch-notifications'
-  if (input === '3') return 'switch-search'
+  if (input === '3') return 'switch-feeds'
   if (input === '4') return 'switch-profile'
   if (input === 'f') return 'like'
   if (input === 'R') return 'repost'

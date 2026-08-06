@@ -14,8 +14,10 @@ export function getHeaderLabel(screen: ScreenId): string {
       return 'Profile'
     case 'compose':
       return screen.replyTo ? 'Reply' : 'Compose'
-    case 'search':
-      return 'Search'
+    case 'feed-list':
+      return 'Feeds'
+    case 'feed':
+      return screen.displayName
     case 'image-view':
       return 'Image'
   }

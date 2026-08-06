@@ -10,13 +10,15 @@ import { ThreadScreen } from './screens/ThreadScreen.js'
 import { ComposeScreen } from './screens/ComposeScreen.js'
 import { NotificationsScreen } from './screens/NotificationsScreen.js'
 import { ProfileScreen } from './screens/ProfileScreen.js'
+import { FeedListScreen } from './screens/FeedListScreen.js'
+import { FeedScreen } from './screens/FeedScreen.js'
 import { HelpOverlay } from './components/HelpOverlay.js'
 import { HeaderBar } from './components/HeaderBar.js'
 import { getHeaderLabel } from './navigation/header-label.js'
 import { fetchUnreadCount } from './api/client.js'
 import { resolveGlobalAction } from './keymap/global-keymap.js'
 import type { AtpClient } from './api/atp-client.js'
-import type { NotificationItem, PostSummary, TimelineItem } from './api/types.js'
+import type { FeedInfo, NotificationItem, PostSummary, TimelineItem } from './api/types.js'
 
 const UNREAD_POLL_INTERVAL_MS = 60000
 
@@ -38,6 +40,12 @@ export function App() {
   }>({ items: [], cursor: undefined, index: 0 })
   const [profileState, setProfileState] = useState<{
     actor: string
+    items: TimelineItem[]
+    cursor: string | undefined
+    index: number
+  } | null>(null)
+  const [feedState, setFeedState] = useState<{
+    uri: string
     items: TimelineItem[]
     cursor: string | undefined
     index: number
@@ -159,6 +167,12 @@ export function App() {
     if (!target) return
     dispatch({ type: 'push', screen: { name: 'profile', actor: target } })
   }
+  function switchToFeedList() {
+    dispatch({ type: 'reset', screen: { name: 'feed-list' } })
+  }
+  function openFeed(feed: FeedInfo) {
+    dispatch({ type: 'push', screen: { name: 'feed', uri: feed.uri, displayName: feed.displayName } })
+  }
   function openCompose(replyTarget?: PostSummary, replyRoot?: PostSummary) {
     dispatch({
       type: 'push',
@@ -199,6 +213,10 @@ export function App() {
       }
       if (action === 'switch-notifications' && top.name !== 'notifications') {
         switchToNotifications()
+        return
+      }
+      if (action === 'switch-feeds' && top.name !== 'feed-list') {
+        switchToFeedList()
         return
       }
       if (action === 'switch-profile') {
@@ -282,6 +300,23 @@ export function App() {
                 initialCursor={profileState?.actor === top.actor ? profileState.cursor : undefined}
                 initialIndex={profileState?.actor === top.actor ? profileState.index : 0}
                 onStateChange={(state) => setProfileState({ actor: top.actor, ...state })}
+                onQuote={openQuoteCompose}
+              />
+            )}
+            {client && top.name === 'feed-list' && <FeedListScreen client={client} active={true} onOpenFeed={openFeed} />}
+            {client && top.name === 'feed' && (
+              <FeedScreen
+                client={client}
+                feedUri={top.uri}
+                active={true}
+                initialItems={feedState?.uri === top.uri ? feedState.items : []}
+                initialCursor={feedState?.uri === top.uri ? feedState.cursor : undefined}
+                initialIndex={feedState?.uri === top.uri ? feedState.index : 0}
+                onStateChange={(state) => setFeedState({ uri: top.uri, ...state })}
+                onOpenThread={openThread}
+                onReply={(post) => openCompose(post)}
+                onCompose={() => openCompose()}
+                onOpenProfile={openProfile}
                 onQuote={openQuoteCompose}
               />
             )}

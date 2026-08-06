@@ -59,6 +59,15 @@ export interface TimelineItem {
   rootUri: string
 }
 
+export interface FeedInfo {
+  uri: string
+  displayName: string
+  description?: string
+  pinned: boolean
+  creatorHandle: string
+  creatorDisplayName?: string
+}
+
 export interface NotificationItem {
   uri: string
   author: Author

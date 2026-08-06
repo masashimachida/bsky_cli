@@ -10,7 +10,8 @@ export type ScreenId =
       quoteTarget?: { uri: string; cid: string; author: Author; text: string }
     }
   | { name: 'notifications' }
-  | { name: 'search' }
+  | { name: 'feed-list' }
+  | { name: 'feed'; uri: string; displayName: string }
   | { name: 'profile'; actor: string }
   | { name: 'image-view'; images: ImageAttachment[]; initialIndex: number }
 

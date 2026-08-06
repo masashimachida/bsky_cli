@@ -13,6 +13,13 @@ export interface AtpPostRecordInput {
   }
 }
 
+export interface AtpSavedFeed {
+  id: string
+  type: string
+  value: string
+  pinned: boolean
+}
+
 export interface AtpClient {
   did?: string
   getTimeline(params: {
@@ -39,6 +46,7 @@ export interface AtpClient {
   }): Promise<{ data: { cursor?: string; notifications: AppBskyNotificationListNotifications.Notification[] } }>
   updateSeenNotifications(seenAt?: string): Promise<void>
   countUnreadNotifications(): Promise<{ data: { count: number } }>
+  getPreferences(): Promise<{ savedFeeds: AtpSavedFeed[] }>
   app: {
     bsky: {
       feed: {
@@ -47,6 +55,21 @@ export interface AtpClient {
           cursor?: string
           limit?: number
         }): Promise<{ data: { cursor?: string; posts: AppBskyFeedDefs.PostView[] } }>
+        getFeed(params: {
+          feed: string
+          cursor?: string
+          limit?: number
+        }): Promise<{ data: { cursor?: string; feed: AppBskyFeedDefs.FeedViewPost[] } }>
+        getFeedGenerators(params: { feeds: string[] }): Promise<{
+          data: {
+            feeds: Array<{
+              uri: string
+              displayName: string
+              description?: string
+              creator: { handle: string; displayName?: string }
+            }>
+          }
+        }>
       }
     }
   }

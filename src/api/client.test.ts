@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   fetchTimeline,
+  fetchFeed,
+  fetchSavedFeeds,
   fetchAuthorFeed,
   fetchNotifications,
   fetchUnreadCount,
@@ -44,7 +46,16 @@ function fakeClient(overrides: Partial<AtpClient> = {}): AtpClient {
     listNotifications: vi.fn(async () => ({ data: { cursor: undefined, notifications: [] } })) as never,
     updateSeenNotifications: vi.fn(async () => undefined),
     countUnreadNotifications: vi.fn(async () => ({ data: { count: 0 } })) as never,
-    app: { bsky: { feed: { searchPosts: vi.fn(async () => ({ data: { cursor: undefined, posts: [rawPost] } })) as never } } },
+    getPreferences: vi.fn(async () => ({ savedFeeds: [] })) as never,
+    app: {
+      bsky: {
+        feed: {
+          searchPosts: vi.fn(async () => ({ data: { cursor: undefined, posts: [rawPost] } })) as never,
+          getFeed: vi.fn(async () => ({ data: { cursor: 'c4', feed: [{ post: rawPost }] } })) as never,
+          getFeedGenerators: vi.fn(async () => ({ data: { feeds: [] } })) as never,
+        },
+      },
+    },
     ...overrides,
   } as AtpClient
 }
@@ -55,6 +66,92 @@ describe('fetchTimeline', () => {
     const page = await fetchTimeline(client)
     expect(page.cursor).toBe('c2')
     expect(page.items[0].post.text).toBe('hi')
+  })
+})
+
+describe('fetchFeed', () => {
+  it('feedUriを渡してgetFeedを呼びTimelineItemに変換しcursorを返す', async () => {
+    const client = fakeClient()
+    const page = await fetchFeed(client, 'at://did:plc:gen/app.bsky.feed.generator/x')
+    expect(client.app.bsky.feed.getFeed).toHaveBeenCalledWith({
+      feed: 'at://did:plc:gen/app.bsky.feed.generator/x',
+      cursor: undefined,
+      limit: 30,
+    })
+    expect(page.cursor).toBe('c4')
+    expect(page.items[0].post.text).toBe('hi')
+  })
+})
+
+describe('fetchSavedFeeds', () => {
+  it('savedFeedsのうちtype===feedのものだけ抽出しgetFeedGeneratorsで詳細を解決する', async () => {
+    const client = fakeClient({
+      getPreferences: vi.fn(async () => ({
+        savedFeeds: [
+          { id: '1', type: 'feed', value: 'at://did:plc:gen/app.bsky.feed.generator/a', pinned: true },
+          { id: '2', type: 'timeline', value: 'following', pinned: true },
+          { id: '3', type: 'feed', value: 'at://did:plc:gen/app.bsky.feed.generator/b', pinned: false },
+        ],
+      })) as never,
+      app: {
+        bsky: {
+          feed: {
+            searchPosts: vi.fn() as never,
+            getFeed: vi.fn() as never,
+            getFeedGenerators: vi.fn(async () => ({
+              data: {
+                feeds: [
+                  {
+                    uri: 'at://did:plc:gen/app.bsky.feed.generator/a',
+                    displayName: 'Feed A',
+                    description: 'desc a',
+                    creator: { did: 'did:plc:creator-a', handle: 'creatora.bsky.social', displayName: 'Creator A' },
+                  },
+                  {
+                    uri: 'at://did:plc:gen/app.bsky.feed.generator/b',
+                    displayName: 'Feed B',
+                    creator: { did: 'did:plc:creator-b', handle: 'creatorb.bsky.social' },
+                  },
+                ],
+              },
+            })) as never,
+          },
+        },
+      },
+    })
+    const feeds = await fetchSavedFeeds(client)
+    expect(client.app.bsky.feed.getFeedGenerators).toHaveBeenCalledWith({
+      feeds: ['at://did:plc:gen/app.bsky.feed.generator/a', 'at://did:plc:gen/app.bsky.feed.generator/b'],
+    })
+    expect(feeds).toEqual([
+      {
+        uri: 'at://did:plc:gen/app.bsky.feed.generator/a',
+        displayName: 'Feed A',
+        description: 'desc a',
+        pinned: true,
+        creatorHandle: 'creatora.bsky.social',
+        creatorDisplayName: 'Creator A',
+      },
+      {
+        uri: 'at://did:plc:gen/app.bsky.feed.generator/b',
+        displayName: 'Feed B',
+        description: undefined,
+        pinned: false,
+        creatorHandle: 'creatorb.bsky.social',
+        creatorDisplayName: undefined,
+      },
+    ])
+  })
+
+  it('type===feedのsavedFeedsが無ければgetFeedGeneratorsを呼ばず空配列を返す', async () => {
+    const client = fakeClient({
+      getPreferences: vi.fn(async () => ({
+        savedFeeds: [{ id: '2', type: 'timeline', value: 'following', pinned: true }],
+      })) as never,
+    })
+    const feeds = await fetchSavedFeeds(client)
+    expect(feeds).toEqual([])
+    expect(client.app.bsky.feed.getFeedGenerators).not.toHaveBeenCalled()
   })
 })
 
