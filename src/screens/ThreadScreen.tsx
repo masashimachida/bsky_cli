@@ -62,6 +62,7 @@ export function ThreadScreen({
   onReply,
   onBack,
   onOpenProfile,
+  onQuote,
 }: {
   client: AtpClient
   uri: string
@@ -72,6 +73,7 @@ export function ThreadScreen({
   onReply: (post: PostSummary, root: PostSummary) => void
   onBack: () => void
   onOpenProfile: (actor: string) => void
+  onQuote: (post: PostSummary) => void
 }) {
   const [posts, setPosts] = useState<PostSummary[]>(initialPosts)
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
@@ -192,6 +194,9 @@ export function ThreadScreen({
       }
       if (action === 'repost') {
         setConfirmAction({ type: 'repost', post: current })
+      }
+      if (action === 'quote') {
+        onQuote(current)
       }
     },
     { isActive: active && !confirmAction },

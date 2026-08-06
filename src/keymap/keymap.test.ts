@@ -40,7 +40,7 @@ describe('resolveListNavigation', () => {
 describe('resolveGlobalAction', () => {
   it.each([
     ['?', 'help'],
-    ['q', 'quit'],
+    ['q', 'quote'],
     ['h', 'back'],
     ['1', 'switch-timeline'],
     ['2', 'switch-notifications'],

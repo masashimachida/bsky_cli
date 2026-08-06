@@ -17,7 +17,7 @@ export type ListNavAction = 'up' | 'down' | 'top' | 'bottom'
 
 export type GlobalAction =
   | 'help'
-  | 'quit'
+  | 'quote'
   | 'back'
   | 'open-thread'
   | 'switch-timeline'

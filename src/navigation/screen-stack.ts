@@ -1,4 +1,4 @@
-import type { ImageAttachment } from '../api/types.js'
+import type { Author, ImageAttachment } from '../api/types.js'
 
 export type ScreenId =
   | { name: 'login' }
@@ -7,6 +7,7 @@ export type ScreenId =
   | {
       name: 'compose'
       replyTo?: { root: { uri: string; cid: string }; parent: { uri: string; cid: string } }
+      quoteTarget?: { uri: string; cid: string; author: Author; text: string }
     }
   | { name: 'notifications' }
   | { name: 'search' }

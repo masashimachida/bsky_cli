@@ -2,7 +2,7 @@ import type { GlobalAction, InkKey } from './types.js'
 
 export function resolveGlobalAction(input: string, key: InkKey): GlobalAction | null {
   if (input === '?') return 'help'
-  if (input === 'q') return 'quit'
+  if (input === 'q') return 'quote'
   if (key.escape || input === 'h') return 'back'
   if (key.return) return 'open-thread'
   if (input === '1') return 'switch-timeline'

@@ -35,6 +35,7 @@ export function ProfileScreen({
   initialCursor,
   initialIndex,
   onStateChange,
+  onQuote,
 }: {
   client: AtpClient
   actor: string
@@ -46,6 +47,7 @@ export function ProfileScreen({
   initialCursor: string | undefined
   initialIndex: number
   onStateChange: (state: { items: TimelineItem[]; cursor: string | undefined; index: number }) => void
+  onQuote: (post: PostSummary) => void
 }) {
   const [profile, setProfile] = useState<ProfileData>()
   const [profileError, setProfileError] = useState<string>()
@@ -172,6 +174,9 @@ export function ProfileScreen({
       }
       if (action === 'repost') {
         setConfirmAction({ type: 'repost', post: current.post })
+      }
+      if (action === 'quote') {
+        onQuote(current.post)
       }
     },
     { isActive: active && !confirmAction },

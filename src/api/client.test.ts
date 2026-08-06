@@ -222,6 +222,16 @@ describe('createPost', () => {
       reply: { root: { uri: 'r', cid: 'rc' }, parent: { uri: 'p', cid: 'pc' } },
     })
   })
+
+  it('quoteを渡すとapp.bsky.embed.record形式のembedを付けてpostを呼ぶ', async () => {
+    const client = fakeClient()
+    await createPost(client, 'quote text', undefined, { uri: 'at://quoted/1', cid: 'qc1' })
+    expect(client.post).toHaveBeenCalledWith({
+      text: 'quote text',
+      reply: undefined,
+      embed: { $type: 'app.bsky.embed.record', record: { uri: 'at://quoted/1', cid: 'qc1' } },
+    })
+  })
 })
 
 const likedPost: PostSummary = {

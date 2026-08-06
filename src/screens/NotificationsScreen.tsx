@@ -12,7 +12,7 @@ import { formatRelativeTime, postWebUrl } from '../api/format.js'
 import { useTerminalRows } from '../navigation/useTerminalRows.js'
 import type { ConfirmAction } from './confirm-action.js'
 import type { AtpClient } from '../api/atp-client.js'
-import type { NotificationItem } from '../api/types.js'
+import type { NotificationItem, PostSummary } from '../api/types.js'
 
 const REASON_LABEL: Record<NotificationItem['reason'], string> = {
   like: 'があなたの投稿をいいねしました',
@@ -33,6 +33,7 @@ export function NotificationsScreen({
   onStateChange,
   onOpenThread,
   onOpenProfile,
+  onQuote,
 }: {
   client: AtpClient
   active: boolean
@@ -42,6 +43,7 @@ export function NotificationsScreen({
   onStateChange: (state: { items: NotificationItem[]; cursor: string | undefined; index: number }) => void
   onOpenThread: (uri: string) => void
   onOpenProfile: (actor?: string) => void
+  onQuote: (post: PostSummary) => void
 }) {
   const [items, setItems] = useState<NotificationItem[]>(initialItems)
   const [cursor, setCursor] = useState<string | undefined>(initialCursor)
@@ -163,6 +165,10 @@ export function NotificationsScreen({
       if (action === 'repost') {
         const current = items[index]
         if (current?.subjectPost) setConfirmAction({ type: 'repost', post: current.subjectPost })
+      }
+      if (action === 'quote') {
+        const current = items[index]
+        if (current?.subjectPost) onQuote(current.subjectPost)
       }
     },
     { isActive: active && !confirmAction },

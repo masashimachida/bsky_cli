@@ -34,6 +34,7 @@ export function TimelineScreen({
   onReply,
   onCompose,
   onOpenProfile,
+  onQuote,
 }: {
   client: AtpClient
   active: boolean
@@ -45,6 +46,7 @@ export function TimelineScreen({
   onReply: (post: PostSummary) => void
   onCompose: () => void
   onOpenProfile: (actor?: string) => void
+  onQuote: (post: PostSummary) => void
 }) {
   const [items, setItems] = useState<TimelineItem[]>(initialItems)
   const [cursor, setCursor] = useState<string | undefined>(initialCursor)
@@ -196,6 +198,9 @@ export function TimelineScreen({
       }
       if (action === 'repost') {
         setConfirmAction({ type: 'repost', post: current.post })
+      }
+      if (action === 'quote') {
+        onQuote(current.post)
       }
     },
     { isActive: active && !confirmAction },

@@ -190,8 +190,9 @@ export async function createPost(
   client: AtpClient,
   text: string,
   reply?: { root: { uri: string; cid: string }; parent: { uri: string; cid: string } },
+  quote?: { uri: string; cid: string },
 ) {
-  return client.post({ text, reply })
+  return client.post({ text, reply, embed: quote ? { $type: 'app.bsky.embed.record', record: quote } : undefined })
 }
 
 export async function toggleLike(

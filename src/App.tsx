@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useReducer, useState } from 'react'
-import { Box, Text, useApp, useInput } from 'ink'
+import { Box, Text, useInput } from 'ink'
 import { InkPictureProvider } from 'ink-picture'
 import { createKeychainSessionStore } from './auth/session-store.js'
 import { createAuthSession, loginWithAppPassword, resumeAgent } from './auth/auth-agent.js'
@@ -11,7 +11,6 @@ import { ComposeScreen } from './screens/ComposeScreen.js'
 import { NotificationsScreen } from './screens/NotificationsScreen.js'
 import { ProfileScreen } from './screens/ProfileScreen.js'
 import { HelpOverlay } from './components/HelpOverlay.js'
-import { ConfirmDialog } from './components/ConfirmDialog.js'
 import { HeaderBar } from './components/HeaderBar.js'
 import { getHeaderLabel } from './navigation/header-label.js'
 import { fetchUnreadCount } from './api/client.js'
@@ -22,7 +21,6 @@ import type { NotificationItem, PostSummary, TimelineItem } from './api/types.js
 const UNREAD_POLL_INTERVAL_MS = 60000
 
 export function App() {
-  const { exit } = useApp()
   const [stack, dispatch] = useReducer(screenStackReducer, initialScreenStackState)
   const [client, setClient] = useState<AtpClient | null>(null)
   const [loginError, setLoginError] = useState<string>()
@@ -45,7 +43,6 @@ export function App() {
     index: number
   } | null>(null)
   const [showHelp, setShowHelp] = useState(false)
-  const [confirmQuit, setConfirmQuit] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
   // 保存済みセッションの有無/有効性を確認するまでは、initialScreenStackStateの
   // 初期値であるlogin画面が一瞬表示されてしまう。判定完了までは起動中表示に留める。
@@ -131,29 +128,9 @@ export function App() {
 
   useInput(
     (input) => {
-      if (input === 'q') setConfirmQuit(true)
-    },
-    { isActive: !showHelp && top.name !== 'login' && top.name !== 'compose' && !confirmQuit },
-  )
-
-  useInput(
-    (input, key) => {
-      if (input === 'y') {
-        exit()
-        return
-      }
-      if (input === 'n' || key.escape) {
-        setConfirmQuit(false)
-      }
-    },
-    { isActive: confirmQuit },
-  )
-
-  useInput(
-    (input) => {
       if (input === '?') setShowHelp(true)
     },
-    { isActive: !showHelp && top.name !== 'login' && top.name !== 'compose' && !confirmQuit },
+    { isActive: !showHelp && top.name !== 'login' && top.name !== 'compose' },
   )
 
   useInput(
@@ -196,6 +173,15 @@ export function App() {
       },
     })
   }
+  function openQuoteCompose(post: PostSummary) {
+    dispatch({
+      type: 'push',
+      screen: {
+        name: 'compose',
+        quoteTarget: { uri: post.uri, cid: post.cid, author: post.author, text: post.text },
+      },
+    })
+  }
   function pop() {
     dispatch({ type: 'pop' })
   }
@@ -220,7 +206,7 @@ export function App() {
         openProfile()
       }
     },
-    { isActive: !showHelp && top.name !== 'login' && top.name !== 'compose' && !confirmQuit },
+    { isActive: !showHelp && top.name !== 'login' && top.name !== 'compose' },
   )
 
   return (
@@ -242,7 +228,7 @@ export function App() {
             {client && top.name === 'timeline' && (
               <TimelineScreen
                 client={client}
-                active={!confirmQuit}
+                active={true}
                 initialItems={timelineState.items}
                 initialCursor={timelineState.cursor}
                 initialIndex={timelineState.index}
@@ -251,41 +237,44 @@ export function App() {
                 onReply={(post) => openCompose(post)}
                 onCompose={() => openCompose()}
                 onOpenProfile={openProfile}
+                onQuote={openQuoteCompose}
               />
             )}
             {client && top.name === 'notifications' && (
               <NotificationsScreen
                 client={client}
-                active={!confirmQuit}
+                active={true}
                 initialItems={notificationsState.items}
                 initialCursor={notificationsState.cursor}
                 initialIndex={notificationsState.index}
                 onStateChange={setNotificationsState}
                 onOpenThread={openThread}
                 onOpenProfile={openProfile}
+                onQuote={openQuoteCompose}
               />
             )}
             {client && top.name === 'thread' && (
               <ThreadScreen
                 client={client}
                 uri={top.uri}
-                active={!confirmQuit}
+                active={true}
                 initialPosts={threadState?.uri === top.uri ? threadState.posts : []}
                 initialIndex={threadState?.uri === top.uri ? threadState.index : 0}
                 onStateChange={(posts, index) => setThreadState({ uri: top.uri, posts, index })}
                 onReply={(post, root) => openCompose(post, root)}
                 onBack={pop}
                 onOpenProfile={openProfile}
+                onQuote={openQuoteCompose}
               />
             )}
             {client && top.name === 'compose' && (
-              <ComposeScreen client={client} replyTo={top.replyTo} onDone={handleComposeDone} onCancel={pop} />
+              <ComposeScreen client={client} replyTo={top.replyTo} quoteTarget={top.quoteTarget} onDone={handleComposeDone} onCancel={pop} />
             )}
             {client && top.name === 'profile' && (
               <ProfileScreen
                 client={client}
                 actor={top.actor}
-                active={!confirmQuit}
+                active={true}
                 onBack={pop}
                 onOpenThread={openThread}
                 onReply={(post) => openCompose(post)}
@@ -293,9 +282,9 @@ export function App() {
                 initialCursor={profileState?.actor === top.actor ? profileState.cursor : undefined}
                 initialIndex={profileState?.actor === top.actor ? profileState.index : 0}
                 onStateChange={(state) => setProfileState({ actor: top.actor, ...state })}
+                onQuote={openQuoteCompose}
               />
             )}
-            {confirmQuit && <ConfirmDialog message="終了しますか?" confirmLabel="y: 終了" cancelLabel="n: キャンセル" />}
           </>
         )}
       </Box>

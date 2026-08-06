@@ -7,6 +7,10 @@ export interface AtpPostRecordInput {
     root: { uri: string; cid: string }
     parent: { uri: string; cid: string }
   }
+  embed?: {
+    $type: 'app.bsky.embed.record'
+    record: { uri: string; cid: string }
+  }
 }
 
 export interface AtpClient {
