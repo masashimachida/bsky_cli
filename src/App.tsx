@@ -47,6 +47,9 @@ export function App() {
   const [showHelp, setShowHelp] = useState(false)
   const [confirmQuit, setConfirmQuit] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
+  // 保存済みセッションの有無/有効性を確認するまでは、initialScreenStackStateの
+  // 初期値であるlogin画面が一瞬表示されてしまう。判定完了までは起動中表示に留める。
+  const [sessionChecked, setSessionChecked] = useState(false)
 
   const store = useMemo(() => createKeychainSessionStore(), [])
 
@@ -61,6 +64,7 @@ export function App() {
     const saved = store.load()
     if (!saved) {
       dispatch({ type: 'reset', screen: { name: 'login' } })
+      setSessionChecked(true)
       return
     }
     try {
@@ -73,8 +77,10 @@ export function App() {
         .catch(() => {
           dispatch({ type: 'reset', screen: { name: 'login' } })
         })
+        .finally(() => setSessionChecked(true))
     } catch {
       dispatch({ type: 'reset', screen: { name: 'login' } })
+      setSessionChecked(true)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -220,8 +226,9 @@ export function App() {
   return (
     <InkPictureProvider config={{ pollIntervalMs: 3600000 }}>
       <Box flexDirection="column">
-        {showHelp && <HelpOverlay />}
-        {!showHelp && (
+        {!sessionChecked && <Text dimColor>🦋起動中🦋</Text>}
+        {sessionChecked && showHelp && <HelpOverlay />}
+        {sessionChecked && !showHelp && (
           <>
             {top.name !== 'login' && (
               <>
