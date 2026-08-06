@@ -106,6 +106,21 @@ export function dedupeTimelineItems(items: TimelineItem[], seenUris: Set<string>
   return result
 }
 
+// タイムライン自動更新用。先頭ページ取得結果(newPageItems)から未見の投稿だけを
+// 抽出しitemsの先頭に追加する。全置換しないため、下にスクロールして古い投稿を
+// 見ている間でも選択中indexがずれない(新着件数分を加算するだけで位置を維持できる)。
+export function mergeNewTimelineItems(
+  items: TimelineItem[],
+  index: number,
+  newPageItems: TimelineItem[],
+  seenUris: Set<string>,
+  seenRootUris?: Set<string>,
+): { items: TimelineItem[]; index: number } {
+  const newItems = dedupeTimelineItems(newPageItems, seenUris, seenRootUris)
+  if (newItems.length === 0) return { items, index }
+  return { items: [...newItems, ...items], index: index + newItems.length }
+}
+
 const GROUPABLE_NOTIFICATION_REASONS: NotificationItem['reason'][] = ['like', 'repost', 'follow']
 
 // Bluesky公式Web版(bluesky-social/social-app)のgroupNotificationsを参考にした簡易版。

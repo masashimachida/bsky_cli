@@ -5,7 +5,14 @@ import { PostItem } from '../components/PostItem.js'
 import { StatusBar } from '../components/StatusBar.js'
 import { ConfirmDialog } from '../components/ConfirmDialog.js'
 import { ScrollingViewport, OVERHEAD_ROWS } from '../components/ScrollingViewport.js'
-import { dedupeTimelineItems, deletePost, fetchTimeline, toggleLike, toggleRepost } from '../api/client.js'
+import {
+  dedupeTimelineItems,
+  deletePost,
+  fetchTimeline,
+  mergeNewTimelineItems,
+  toggleLike,
+  toggleRepost,
+} from '../api/client.js'
 import { postWebUrl } from '../api/format.js'
 import { resolveListNavigation } from '../keymap/vim-list-keymap.js'
 import { resolveGlobalAction } from '../keymap/global-keymap.js'
@@ -55,6 +62,9 @@ export function TimelineScreen({
     new Set(initialItems.filter((it) => it.repostedBy === undefined).map((it) => it.rootUri)),
   )
 
+  const latestStateRef = useRef({ items, cursor, index })
+  latestStateRef.current = { items, cursor, index }
+
   const loadMore = useCallback(async () => {
     if (isLoadingMoreRef.current) return
     isLoadingMoreRef.current = true
@@ -75,28 +85,34 @@ export function TimelineScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client, cursor])
 
-  const reloadTimeline = useCallback(async () => {
-    if (isLoadingMoreRef.current) return
-    isLoadingMoreRef.current = true
-    setIsLoadingMore(true)
-    const currentUri = items[index]?.post.uri
-    try {
-      const page = await fetchTimeline(client, undefined)
-      seenUrisRef.current = new Set()
-      seenRootUrisRef.current = new Set()
-      const newItems = dedupeTimelineItems(page.items, seenUrisRef.current, seenRootUrisRef.current)
-      setItems(newItems)
-      setCursor(page.cursor)
-      const newIndex = currentUri ? newItems.findIndex((it) => it.post.uri === currentUri) : -1
-      setIndex(newIndex >= 0 ? newIndex : 0)
-      setError(undefined)
-    } catch {
-      setError('接続エラー — rで再試行')
-    } finally {
-      isLoadingMoreRef.current = false
-      setIsLoadingMore(false)
-    }
-  }, [client, items, index])
+  // silent=trueはタイマーによるバックグラウンド自動更新。ローディング表示やエラー
+  // 表示を出さず、失敗時は次回のタイマー発火に任せて黙って諦める。
+  const reloadTimeline = useCallback(
+    async (silent = false) => {
+      if (isLoadingMoreRef.current) return
+      isLoadingMoreRef.current = true
+      if (!silent) setIsLoadingMore(true)
+      try {
+        const page = await fetchTimeline(client, undefined)
+        const merged = mergeNewTimelineItems(
+          latestStateRef.current.items,
+          latestStateRef.current.index,
+          page.items,
+          seenUrisRef.current,
+          seenRootUrisRef.current,
+        )
+        setItems(merged.items)
+        setIndex(merged.index)
+        if (!silent) setError(undefined)
+      } catch {
+        if (!silent) setError('接続エラー — rで再試行')
+      } finally {
+        isLoadingMoreRef.current = false
+        if (!silent) setIsLoadingMore(false)
+      }
+    },
+    [client],
+  )
 
   useEffect(() => {
     if (initialItems.length === 0) {
@@ -108,17 +124,9 @@ export function TimelineScreen({
   const reloadTimelineRef = useRef(reloadTimeline)
   reloadTimelineRef.current = reloadTimeline
 
-  const latestStateRef = useRef({ items, cursor, index })
-  latestStateRef.current = { items, cursor, index }
-
   useEffect(() => {
     const interval = setInterval(() => {
-      // reloadTimelineは最新1ページ分しか取得しないため、下にスクロールして
-      // 古い投稿を見ている間に自動更新すると、現在位置がそのページに含まれず
-      // indexが先頭にフォールバックしてしまう。先頭にいる時だけ自動更新する。
-      if (latestStateRef.current.index === 0) {
-        reloadTimelineRef.current()
-      }
+      reloadTimelineRef.current(true)
     }, AUTO_REFRESH_INTERVAL_MS)
     return () => clearInterval(interval)
   }, [])

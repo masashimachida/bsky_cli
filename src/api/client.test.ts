@@ -10,6 +10,7 @@ import {
   toggleRepost,
   deletePost,
   dedupeTimelineItems,
+  mergeNewTimelineItems,
   groupNotificationItems,
 } from './client.js'
 import { toTimelineItems } from './format.js'
@@ -520,6 +521,30 @@ function makeNotification(overrides: Partial<NotificationItem> = {}): Notificati
     ...overrides,
   }
 }
+
+describe('mergeNewTimelineItems', () => {
+  it('新着があれば先頭に追加しindexを新着件数分加算する', () => {
+    const existing = [makeItem('at://p/b'), makeItem('at://p/a')]
+    const seenUris = new Set(existing.map((it) => it.post.uri))
+    const newPage = [makeItem('at://p/d'), makeItem('at://p/c'), makeItem('at://p/b')]
+
+    const result = mergeNewTimelineItems(existing, 1, newPage, seenUris)
+
+    expect(result.items.map((it) => it.post.uri)).toEqual(['at://p/d', 'at://p/c', 'at://p/b', 'at://p/a'])
+    expect(result.index).toBe(3)
+  })
+
+  it('新着が無ければitems/indexとも変化しない', () => {
+    const existing = [makeItem('at://p/b'), makeItem('at://p/a')]
+    const seenUris = new Set(existing.map((it) => it.post.uri))
+    const newPage = [makeItem('at://p/b'), makeItem('at://p/a')]
+
+    const result = mergeNewTimelineItems(existing, 1, newPage, seenUris)
+
+    expect(result.items).toBe(existing)
+    expect(result.index).toBe(1)
+  })
+})
 
 describe('groupNotificationItems', () => {
   it('同じreason・同じreasonSubjectUri・異なる著者のlike通知は1件にグルーピングされる', () => {
