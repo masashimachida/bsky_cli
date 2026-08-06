@@ -51,6 +51,7 @@ describe('resolveGlobalAction', () => {
     ['r', 'reply'],
     ['n', 'compose'],
     ['o', 'open-link'],
+    ['O', 'open-post'],
     ['i', 'view-image'],
     ['u', 'view-author'],
     ['d', 'delete'],

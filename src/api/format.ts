@@ -1,4 +1,4 @@
-import type { Author, ImageAttachment, NotificationItem, PostSummary, QuotedPost, TimelineItem } from './types.js'
+import type { Author, ImageAttachment, LinkCard, NotificationItem, PostSummary, QuotedPost, TimelineItem } from './types.js'
 
 interface RawAuthor {
   did: string
@@ -21,6 +21,11 @@ interface RawVideoEmbed {
   $type: 'app.bsky.embed.video#view'
 }
 
+interface RawExternalEmbed {
+  $type: 'app.bsky.embed.external#view'
+  external: { uri: string; title: string; description: string; thumb?: string }
+}
+
 interface RawViewRecord {
   $type: 'app.bsky.embed.record#viewRecord'
   author: RawAuthor
@@ -37,10 +42,17 @@ interface RawRecordEmbed {
 interface RawRecordWithMediaEmbed {
   $type: 'app.bsky.embed.recordWithMedia#view'
   record: { record: RawEmbedRecordResult }
-  media?: RawImagesEmbed | RawVideoEmbed | { $type?: string }
+  media?: RawImagesEmbed | RawVideoEmbed | RawExternalEmbed | { $type?: string }
 }
 
-type RawEmbed = RawImagesEmbed | RawVideoEmbed | RawRecordEmbed | RawRecordWithMediaEmbed | { $type: string } | undefined
+type RawEmbed =
+  | RawImagesEmbed
+  | RawVideoEmbed
+  | RawExternalEmbed
+  | RawRecordEmbed
+  | RawRecordWithMediaEmbed
+  | { $type: string }
+  | undefined
 
 function isViewRecord(v: RawEmbedRecordResult): v is RawViewRecord {
   return v.$type === 'app.bsky.embed.record#viewRecord'
@@ -75,6 +87,25 @@ function extractImagesEmbed(embed: RawEmbed): RawImagesEmbed | undefined {
     if (media?.$type === 'app.bsky.embed.images#view') return media as RawImagesEmbed
   }
   return undefined
+}
+
+const LINK_CARD_DESCRIPTION_MAX_LENGTH = 100
+
+function truncateDescription(description: string): string {
+  if (description.length <= LINK_CARD_DESCRIPTION_MAX_LENGTH) return description
+  return description.slice(0, LINK_CARD_DESCRIPTION_MAX_LENGTH) + '...'
+}
+
+function extractExternalEmbed(embed: RawEmbed): LinkCard | undefined {
+  const external =
+    embed?.$type === 'app.bsky.embed.external#view'
+      ? (embed as RawExternalEmbed).external
+      : embed?.$type === 'app.bsky.embed.recordWithMedia#view' &&
+          (embed as RawRecordWithMediaEmbed).media?.$type === 'app.bsky.embed.external#view'
+        ? ((embed as RawRecordWithMediaEmbed).media as RawExternalEmbed).external
+        : undefined
+  if (!external) return undefined
+  return { uri: external.uri, title: external.title, description: truncateDescription(external.description) }
 }
 
 interface RawPostView {
@@ -185,6 +216,7 @@ export function toPostSummary(post: RawPostView): PostSummary {
     viewerLikeUri: post.viewer?.like,
     viewerRepostUri: post.viewer?.repost,
     quotedPost: extractQuotedPost(post.embed),
+    linkCard: extractExternalEmbed(post.embed),
   }
 }
 

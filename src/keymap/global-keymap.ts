@@ -14,6 +14,7 @@ export function resolveGlobalAction(input: string, key: InkKey): GlobalAction | 
   if (input === 'r') return 'reply'
   if (input === 'n') return 'compose'
   if (input === 'o') return 'open-link'
+  if (input === 'O') return 'open-post'
   if (input === 'i') return 'view-image'
   if (input === 'u') return 'view-author'
   if (input === 'd') return 'delete'

@@ -179,6 +179,9 @@ export function TimelineScreen({
       if (action === 'compose') onCompose()
       if (action === 'view-author') onOpenProfile(current.post.author.did)
       if (action === 'open-link') {
+        if (current.post.linkCard) open(current.post.linkCard.uri).catch(() => {})
+      }
+      if (action === 'open-post') {
         open(postWebUrl(current.post)).catch(() => {})
       }
       if (action === 'delete') {

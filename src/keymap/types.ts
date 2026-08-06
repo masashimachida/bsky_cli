@@ -29,6 +29,7 @@ export type GlobalAction =
   | 'reply'
   | 'compose'
   | 'open-link'
+  | 'open-post'
   | 'view-image'
   | 'view-author'
   | 'delete'

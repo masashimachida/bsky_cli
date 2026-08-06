@@ -154,6 +154,10 @@ export function NotificationsScreen({
       }
       if (action === 'open-link') {
         const current = items[index]
+        if (current?.subjectPost?.linkCard) open(current.subjectPost.linkCard.uri).catch(() => {})
+      }
+      if (action === 'open-post') {
+        const current = items[index]
         if (current?.subjectPost) open(postWebUrl(current.subjectPost)).catch(() => {})
       }
       if (action === 'repost') {

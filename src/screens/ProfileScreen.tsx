@@ -160,6 +160,9 @@ export function ProfileScreen({
       if (action === 'open-thread') onOpenThread(current.post.uri)
       if (action === 'reply') onReply(current.post)
       if (action === 'open-link') {
+        if (current.post.linkCard) open(current.post.linkCard.uri).catch(() => {})
+      }
+      if (action === 'open-post') {
         open(postWebUrl(current.post)).catch(() => {})
       }
       if (action === 'like') {

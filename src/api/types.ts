@@ -17,6 +17,12 @@ export type QuotedPost =
   | { status: 'blocked' }
   | { status: 'detached' }
 
+export interface LinkCard {
+  uri: string
+  title: string
+  description: string
+}
+
 export interface PostSummary {
   uri: string
   cid: string
@@ -31,6 +37,7 @@ export interface PostSummary {
   viewerLikeUri?: string
   viewerRepostUri?: string
   quotedPost?: QuotedPost
+  linkCard?: LinkCard
 }
 
 export interface TimelineItem {

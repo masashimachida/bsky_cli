@@ -180,6 +180,9 @@ export function ThreadScreen({
       if (action === 'reply') onReply(current, posts[0] ?? current)
       if (action === 'view-author') onOpenProfile(current.author.did)
       if (action === 'open-link') {
+        if (current.linkCard) open(current.linkCard.uri).catch(() => {})
+      }
+      if (action === 'open-post') {
         open(postWebUrl(current)).catch(() => {})
       }
       if (action === 'like') {

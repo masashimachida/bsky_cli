@@ -82,6 +82,13 @@ export function PostItem({
             <Text color="#666666">(投稿者がこの引用を削除しました)</Text>
           </Box>
         )}
+        {post.linkCard && (
+          <Box borderStyle="round" borderColor="#666666" paddingX={1} flexDirection="column">
+            <Text bold>{post.linkCard.title}</Text>
+            {post.linkCard.description && <Text color="#666666">{post.linkCard.description}</Text>}
+            <Text color="cyan">{post.linkCard.uri}</Text>
+          </Box>
+        )}
         <Box gap={2}>
           <Text color={post.viewerLikeUri ? 'magenta' : undefined}>{post.viewerLikeUri ? '♥' : '♡'} {post.likeCount}</Text>
           <Text color={post.viewerRepostUri ? 'green' : undefined}>↻ {post.repostCount}</Text>

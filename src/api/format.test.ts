@@ -192,6 +192,79 @@ describe('toPostSummary', () => {
   it('引用が無ければquotedPostはundefined', () => {
     expect(toPostSummary(rawPostView as never).quotedPost).toBeUndefined()
   })
+
+  it('external embed(外部リンクカード)があればlinkCardを設定する', () => {
+    const withLink = {
+      ...rawPostView,
+      embed: {
+        $type: 'app.bsky.embed.external#view',
+        external: {
+          uri: 'https://example.com/article',
+          title: '記事タイトル',
+          description: '記事の説明文',
+          thumb: 'https://cdn/thumb.jpg',
+        },
+      },
+    } as never
+    expect(toPostSummary(withLink).linkCard).toEqual({
+      uri: 'https://example.com/article',
+      title: '記事タイトル',
+      description: '記事の説明文',
+    })
+  })
+
+  it('recordWithMedia embed(引用+外部リンクカード)があればlinkCardとquotedPostの両方を設定する', () => {
+    const quotedWithLink = {
+      ...rawPostView,
+      embed: {
+        $type: 'app.bsky.embed.recordWithMedia#view',
+        record: {
+          record: {
+            $type: 'app.bsky.embed.record#viewRecord',
+            uri: 'at://did:plc:xyz/app.bsky.feed.post/quoted3',
+            cid: 'bafyquoted3',
+            author: { ...rawAuthor, handle: 'carol.bsky.social' },
+            value: { text: 'quoted text3', createdAt: '2026-08-01T00:00:05.000Z' },
+          },
+        },
+        media: {
+          $type: 'app.bsky.embed.external#view',
+          external: { uri: 'https://example.com/x', title: 'X', description: 'Y' },
+        },
+      },
+    } as never
+    const result = toPostSummary(quotedWithLink)
+    expect(result.linkCard).toEqual({ uri: 'https://example.com/x', title: 'X', description: 'Y' })
+    expect(result.quotedPost?.status).toBe('available')
+  })
+
+  it('embedが無ければlinkCardはundefined', () => {
+    expect(toPostSummary(rawPostView as never).linkCard).toBeUndefined()
+  })
+
+  it('descriptionが100文字を超える場合は100文字+...に切り詰める', () => {
+    const longDescription = 'あ'.repeat(150)
+    const withLongDescription = {
+      ...rawPostView,
+      embed: {
+        $type: 'app.bsky.embed.external#view',
+        external: { uri: 'https://example.com/a', title: 'T', description: longDescription },
+      },
+    } as never
+    expect(toPostSummary(withLongDescription).linkCard?.description).toBe('あ'.repeat(100) + '...')
+  })
+
+  it('descriptionが100文字以内なら切り詰めない', () => {
+    const description = 'あ'.repeat(100)
+    const post = {
+      ...rawPostView,
+      embed: {
+        $type: 'app.bsky.embed.external#view',
+        external: { uri: 'https://example.com/a', title: 'T', description },
+      },
+    } as never
+    expect(toPostSummary(post).linkCard?.description).toBe(description)
+  })
 })
 
 describe('toTimelineItems', () => {
