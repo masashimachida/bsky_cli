@@ -17,6 +17,7 @@ import { HeaderBar } from './components/HeaderBar.js'
 import { getHeaderLabel } from './navigation/header-label.js'
 import { fetchUnreadCount } from './api/client.js'
 import { resolveGlobalAction } from './keymap/global-keymap.js'
+import type { StatusMessage } from './navigation/useStatusMessage.js'
 import type { AtpClient } from './api/atp-client.js'
 import type { FeedInfo, NotificationItem, PostSummary, TimelineItem } from './api/types.js'
 
@@ -52,6 +53,7 @@ export function App() {
   } | null>(null)
   const [showHelp, setShowHelp] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
+  const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(null)
   // 保存済みセッションの有無/有効性を確認するまでは、initialScreenStackStateの
   // 初期値であるlogin画面が一瞬表示されてしまう。判定完了までは起動中表示に留める。
   const [sessionChecked, setSessionChecked] = useState(false)
@@ -246,7 +248,9 @@ export function App() {
             {top.name !== 'login' && (
               <>
                 <HeaderBar label={getHeaderLabel(top)} count={unreadCount} />
-                <Text> </Text>
+                <Box justifyContent="flex-end">
+                  <Text color={statusMessage?.error ? 'red' : 'gray'}>{statusMessage?.text ?? ' '}</Text>
+                </Box>
               </>
             )}
             {top.name === 'login' && (
@@ -265,6 +269,7 @@ export function App() {
                 onCompose={() => openCompose()}
                 onOpenProfile={openProfile}
                 onQuote={openQuoteCompose}
+                onStatusChange={setStatusMessage}
               />
             )}
             {client && top.name === 'notifications' && (
@@ -278,6 +283,7 @@ export function App() {
                 onOpenThread={openThread}
                 onOpenProfile={openProfile}
                 onQuote={openQuoteCompose}
+                onStatusChange={setStatusMessage}
               />
             )}
             {client && top.name === 'thread' && (
@@ -296,10 +302,18 @@ export function App() {
                 onSwitchNotifications={switchToNotifications}
                 onSwitchFeeds={switchToFeedList}
                 onSwitchProfile={switchToProfile}
+                onStatusChange={setStatusMessage}
               />
             )}
             {client && top.name === 'compose' && (
-              <ComposeScreen client={client} replyTo={top.replyTo} quoteTarget={top.quoteTarget} onDone={handleComposeDone} onCancel={pop} />
+              <ComposeScreen
+                client={client}
+                replyTo={top.replyTo}
+                quoteTarget={top.quoteTarget}
+                onDone={handleComposeDone}
+                onCancel={pop}
+                onStatusChange={setStatusMessage}
+              />
             )}
             {client && top.name === 'profile' && (
               <ProfileScreen
@@ -314,9 +328,12 @@ export function App() {
                 initialIndex={profileState?.actor === top.actor ? profileState.index : 0}
                 onStateChange={(state) => setProfileState({ actor: top.actor, ...state })}
                 onQuote={openQuoteCompose}
+                onStatusChange={setStatusMessage}
               />
             )}
-            {client && top.name === 'feed-list' && <FeedListScreen client={client} active={true} onOpenFeed={openFeed} />}
+            {client && top.name === 'feed-list' && (
+              <FeedListScreen client={client} active={true} onOpenFeed={openFeed} onStatusChange={setStatusMessage} />
+            )}
             {client && top.name === 'feed' && (
               <FeedScreen
                 client={client}
@@ -331,6 +348,7 @@ export function App() {
                 onCompose={() => openCompose()}
                 onOpenProfile={openProfile}
                 onQuote={openQuoteCompose}
+                onStatusChange={setStatusMessage}
               />
             )}
           </>

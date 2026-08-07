@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Box, useInput } from 'ink'
 import open from 'open'
 import { PostItem } from '../components/PostItem.js'
-import { StatusBar } from '../components/StatusBar.js'
 import { ConfirmDialog } from '../components/ConfirmDialog.js'
 import { ScrollingViewport, OVERHEAD_ROWS } from '../components/ScrollingViewport.js'
 import {
@@ -17,6 +16,8 @@ import { postWebUrl } from '../api/format.js'
 import { resolveListNavigation } from '../keymap/vim-list-keymap.js'
 import { resolveGlobalAction } from '../keymap/global-keymap.js'
 import { useTerminalRows } from '../navigation/useTerminalRows.js'
+import { useStatusMessage } from '../navigation/useStatusMessage.js'
+import type { StatusMessage } from '../navigation/useStatusMessage.js'
 import type { ConfirmAction } from './confirm-action.js'
 import type { AtpClient } from '../api/atp-client.js'
 import type { PostSummary, TimelineItem } from '../api/types.js'
@@ -36,6 +37,7 @@ export function FeedScreen({
   onCompose,
   onOpenProfile,
   onQuote,
+  onStatusChange,
 }: {
   client: AtpClient
   feedUri: string
@@ -49,6 +51,7 @@ export function FeedScreen({
   onCompose: () => void
   onOpenProfile: (actor?: string) => void
   onQuote: (post: PostSummary) => void
+  onStatusChange: (message: StatusMessage | null) => void
 }) {
   const [items, setItems] = useState<TimelineItem[]>(initialItems)
   const [cursor, setCursor] = useState<string | undefined>(initialCursor)
@@ -138,6 +141,8 @@ export function FeedScreen({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useStatusMessage(onStatusChange, loading || isLoadingMore ? '読み込み中...' : undefined, error)
 
   useInput(
     (input, key) => {
@@ -248,11 +253,7 @@ export function FeedScreen({
   const rows = useTerminalRows()
 
   if (loading) {
-    return (
-      <Box flexDirection="column">
-        <StatusBar hint=" " status="読み込み中..." />
-      </Box>
-    )
+    return <Box flexDirection="column" />
   }
 
   const availableRows = Math.max(1, rows - OVERHEAD_ROWS)
@@ -279,7 +280,6 @@ export function FeedScreen({
           />
         )}
       />
-      <StatusBar hint=" " status={isLoadingMore ? '読み込み中...' : undefined} error={error} />
       {confirmAction?.type === 'delete' && <ConfirmDialog message="この投稿を削除しますか?" />}
       {confirmAction?.type === 'repost' && (
         <ConfirmDialog

@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react'
 import { Box, Text, useInput } from 'ink'
-import { StatusBar } from '../components/StatusBar.js'
 import { fetchSavedFeeds } from '../api/client.js'
 import { resolveListNavigation } from '../keymap/vim-list-keymap.js'
+import { useStatusMessage } from '../navigation/useStatusMessage.js'
+import type { StatusMessage } from '../navigation/useStatusMessage.js'
 import type { AtpClient } from '../api/atp-client.js'
 import type { FeedInfo } from '../api/types.js'
 
@@ -10,10 +11,12 @@ export function FeedListScreen({
   client,
   active,
   onOpenFeed,
+  onStatusChange,
 }: {
   client: AtpClient
   active: boolean
   onOpenFeed: (feed: FeedInfo) => void
+  onStatusChange: (message: StatusMessage | null) => void
 }) {
   const [feeds, setFeeds] = useState<FeedInfo[]>()
   const [error, setError] = useState<string>()
@@ -34,6 +37,12 @@ export function FeedListScreen({
       cancelled = true
     }
   }, [client])
+
+  useStatusMessage(
+    onStatusChange,
+    !feeds ? '読み込み中...' : feeds.length === 0 ? '保存済みフィードがありません' : undefined,
+    error,
+  )
 
   useInput(
     (input, key) => {
@@ -71,27 +80,15 @@ export function FeedListScreen({
   )
 
   if (error) {
-    return (
-      <Box flexDirection="column">
-        <StatusBar hint=" " error={error} />
-      </Box>
-    )
+    return <Box flexDirection="column" />
   }
 
   if (!feeds) {
-    return (
-      <Box flexDirection="column">
-        <StatusBar hint=" " status="読み込み中..." />
-      </Box>
-    )
+    return <Box flexDirection="column" />
   }
 
   if (feeds.length === 0) {
-    return (
-      <Box flexDirection="column">
-        <StatusBar hint=" " status="保存済みフィードがありません" />
-      </Box>
-    )
+    return <Box flexDirection="column" />
   }
 
   return (
@@ -115,7 +112,6 @@ export function FeedListScreen({
           {feed.description && <Text>{feed.description}</Text>}
         </Box>
       ))}
-      <StatusBar hint="Enter: 開く" />
     </Box>
   )
 }

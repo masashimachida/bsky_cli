@@ -1,8 +1,9 @@
 import React, { useState } from 'react'
 import { Box, Text } from 'ink'
 import { MultilineTextInput } from '../components/MultilineTextInput.js'
-import { StatusBar } from '../components/StatusBar.js'
 import { createPost } from '../api/client.js'
+import { useStatusMessage } from '../navigation/useStatusMessage.js'
+import type { StatusMessage } from '../navigation/useStatusMessage.js'
 import type { AtpClient } from '../api/atp-client.js'
 import type { Author } from '../api/types.js'
 
@@ -24,15 +25,19 @@ export function ComposeScreen({
   quoteTarget,
   onDone,
   onCancel,
+  onStatusChange,
 }: {
   client: AtpClient
   replyTo?: ComposeReplyTarget
   quoteTarget?: ComposeQuoteTarget
   onDone: () => void
   onCancel: () => void
+  onStatusChange: (message: StatusMessage | null) => void
 }) {
   const [error, setError] = useState<string>()
   const [posting, setPosting] = useState(false)
+
+  useStatusMessage(onStatusChange, posting ? '投稿中...' : undefined, error)
 
   async function handleSubmit(text: string) {
     const trimmed = text.trim()
@@ -64,7 +69,6 @@ export function ComposeScreen({
         </Box>
       )}
       <MultilineTextInput active={!posting} onSubmit={handleSubmit} onCancel={onCancel} />
-      <StatusBar hint="Enter: 投稿 / Alt+Enter: 改行 / Esc: キャンセル" status={posting ? '投稿中...' : undefined} error={error} />
     </Box>
   )
 }

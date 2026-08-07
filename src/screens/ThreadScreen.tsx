@@ -3,7 +3,6 @@ import { Box, useInput } from 'ink'
 import open from 'open'
 import type { AppBskyFeedDefs } from '@atproto/api'
 import { PostItem } from '../components/PostItem.js'
-import { StatusBar } from '../components/StatusBar.js'
 import { ConfirmDialog } from '../components/ConfirmDialog.js'
 import { ScrollingViewport, OVERHEAD_ROWS } from '../components/ScrollingViewport.js'
 import { postWebUrl, toPostSummary } from '../api/format.js'
@@ -11,6 +10,8 @@ import { toggleLike, toggleRepost } from '../api/client.js'
 import { resolveListNavigation } from '../keymap/vim-list-keymap.js'
 import { resolveGlobalAction } from '../keymap/global-keymap.js'
 import { useTerminalRows } from '../navigation/useTerminalRows.js'
+import { useStatusMessage } from '../navigation/useStatusMessage.js'
+import type { StatusMessage } from '../navigation/useStatusMessage.js'
 import type { ConfirmAction } from './confirm-action.js'
 import type { AtpClient } from '../api/atp-client.js'
 import type { PostSummary } from '../api/types.js'
@@ -67,6 +68,7 @@ export function ThreadScreen({
   onSwitchNotifications,
   onSwitchFeeds,
   onSwitchProfile,
+  onStatusChange,
 }: {
   client: AtpClient
   uri: string
@@ -82,6 +84,7 @@ export function ThreadScreen({
   onSwitchNotifications: () => void
   onSwitchFeeds: () => void
   onSwitchProfile: () => void
+  onStatusChange: (message: StatusMessage | null) => void
 }) {
   const [posts, setPosts] = useState<PostSummary[]>(initialPosts)
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
@@ -151,6 +154,8 @@ export function ThreadScreen({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useStatusMessage(onStatusChange, loading ? '読み込み中...' : undefined, error)
 
   // TimelineScreenと同じ理由でdebounce化(詳細はそちらのコメント参照)
   const hasPosts = posts.length > 0
@@ -276,11 +281,7 @@ export function ThreadScreen({
   const rows = useTerminalRows()
 
   if (loading) {
-    return (
-      <Box flexDirection="column">
-        <StatusBar hint=" " status="読み込み中..." />
-      </Box>
-    )
+    return <Box flexDirection="column" />
   }
 
   const availableRows = Math.max(1, rows - OVERHEAD_ROWS)
@@ -297,7 +298,6 @@ export function ThreadScreen({
           <PostItem post={post} selected={selected} expanded={selected && isExpanded} indent={post.uri !== focusUri} />
         )}
       />
-      <StatusBar hint=" " error={error} />
       {confirmAction?.type === 'repost' && (
         <ConfirmDialog
           message="この投稿をリポストしますか?"

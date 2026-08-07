@@ -2,8 +2,8 @@ import React, { useLayoutEffect, useRef, useState } from 'react'
 import { Box, measureElement } from 'ink'
 import type { DOMElement } from 'ink'
 
-// HeaderBar分(枠無し1行) + HeaderBar直後の空行(1) + StatusBar分(上枠+本文+下枠=3) + ターミナル行数ぴったりを避ける安全マージン(1)
-export const OVERHEAD_ROWS = 6
+// HeaderBar分(枠無し1行) + HeaderBar直後のメッセージ行(1) + ターミナル行数ぴったりを避ける安全マージン(1)
+export const OVERHEAD_ROWS = 3
 const SCROLLOFF = 1
 const MAX_RENDER_COUNT = 40 // 描画件数の安全上限(見積もりではない)
 

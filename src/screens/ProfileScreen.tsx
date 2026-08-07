@@ -3,7 +3,6 @@ import { Box, Text, useInput, measureElement } from 'ink'
 import type { DOMElement } from 'ink'
 import open from 'open'
 import { PostItem } from '../components/PostItem.js'
-import { StatusBar } from '../components/StatusBar.js'
 import { ConfirmDialog } from '../components/ConfirmDialog.js'
 import { ScrollingViewport, OVERHEAD_ROWS } from '../components/ScrollingViewport.js'
 import { dedupeTimelineItems, fetchAuthorFeed, toggleBlock, toggleFollow, toggleLike, toggleMute, toggleRepost } from '../api/client.js'
@@ -11,6 +10,8 @@ import { postWebUrl } from '../api/format.js'
 import { resolveListNavigation } from '../keymap/vim-list-keymap.js'
 import { resolveGlobalAction } from '../keymap/global-keymap.js'
 import { useTerminalRows } from '../navigation/useTerminalRows.js'
+import { useStatusMessage } from '../navigation/useStatusMessage.js'
+import type { StatusMessage } from '../navigation/useStatusMessage.js'
 import type { ConfirmAction } from './confirm-action.js'
 import type { AtpClient } from '../api/atp-client.js'
 import type { PostSummary, TimelineItem } from '../api/types.js'
@@ -66,6 +67,7 @@ export function ProfileScreen({
   initialIndex,
   onStateChange,
   onQuote,
+  onStatusChange,
 }: {
   client: AtpClient
   actor: string
@@ -78,6 +80,7 @@ export function ProfileScreen({
   initialIndex: number
   onStateChange: (state: { items: TimelineItem[]; cursor: string | undefined; index: number }) => void
   onQuote: (post: PostSummary) => void
+  onStatusChange: (message: StatusMessage | null) => void
 }) {
   const [profile, setProfile] = useState<ProfileData>()
   const [profileError, setProfileError] = useState<string>()
@@ -157,6 +160,8 @@ export function ProfileScreen({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useStatusMessage(onStatusChange, !profile || feedLoading || isLoadingMore ? '読み込み中...' : undefined, profileError ?? feedError)
 
   useInput(
     (input, key) => {
@@ -307,30 +312,10 @@ export function ProfileScreen({
   }, [profile])
 
   if (profileError) {
-    return (
-      <Box flexDirection="column" height={rows}>
-        <StatusBar hint=" " error={profileError} />
-        {confirmAction?.type === 'repost' && (
-          <ConfirmDialog
-            message="この投稿をリポストしますか?"
-            confirmLabel={confirmAction.post.viewerRepostUri ? 'y: リポスト解除' : 'y: リポスト'}
-          />
-        )}
-      </Box>
-    )
+    return <Box flexDirection="column" height={rows} />
   }
   if (!profile) {
-    return (
-      <Box flexDirection="column" height={rows}>
-        <StatusBar hint=" " status="読み込み中..." />
-        {confirmAction?.type === 'repost' && (
-          <ConfirmDialog
-            message="この投稿をリポストしますか?"
-            confirmLabel={confirmAction.post.viewerRepostUri ? 'y: リポスト解除' : 'y: リポスト'}
-          />
-        )}
-      </Box>
-    )
+    return <Box flexDirection="column" height={rows} />
   }
 
   const availableRows = Math.max(1, rows - headerHeight - OVERHEAD_ROWS)
@@ -376,7 +361,6 @@ export function ProfileScreen({
           )}
         />
       )}
-      <StatusBar hint=" " status={feedLoading || isLoadingMore ? '読み込み中...' : undefined} error={feedError} />
       {confirmAction?.type === 'repost' && (
         <ConfirmDialog
           message="この投稿をリポストしますか?"
