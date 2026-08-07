@@ -6,6 +6,7 @@ import { PostItem } from '../components/PostItem.js'
 import { ConfirmDialog } from '../components/ConfirmDialog.js'
 import { ScrollingViewport, OVERHEAD_ROWS } from '../components/ScrollingViewport.js'
 import { postWebUrl, toPostSummary } from '../api/format.js'
+import { isSafeExternalUrl } from '../api/sanitize.js'
 import { toggleLike, toggleRepost } from '../api/client.js'
 import { resolveListNavigation } from '../keymap/vim-list-keymap.js'
 import { resolveGlobalAction } from '../keymap/global-keymap.js'
@@ -233,7 +234,7 @@ export function ThreadScreen({
       if (action === 'reply') onReply(current, posts[0] ?? current)
       if (action === 'view-author') onOpenProfile(current.author.did)
       if (action === 'open-link') {
-        if (current.linkCard) open(current.linkCard.uri).catch(() => {})
+        if (current.linkCard && isSafeExternalUrl(current.linkCard.uri)) open(current.linkCard.uri).catch(() => {})
       }
       if (action === 'open-post') {
         open(postWebUrl(current)).catch(() => {})

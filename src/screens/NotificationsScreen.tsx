@@ -8,6 +8,7 @@ import { fetchNotifications, toggleRepost } from '../api/client.js'
 import { resolveListNavigation } from '../keymap/vim-list-keymap.js'
 import { resolveGlobalAction } from '../keymap/global-keymap.js'
 import { formatRelativeTime, postWebUrl } from '../api/format.js'
+import { isSafeExternalUrl } from '../api/sanitize.js'
 import { useTerminalRows } from '../navigation/useTerminalRows.js'
 import { useStatusMessage } from '../navigation/useStatusMessage.js'
 import type { StatusMessage } from '../navigation/useStatusMessage.js'
@@ -161,7 +162,8 @@ export function NotificationsScreen({
       }
       if (action === 'open-link') {
         const current = items[index]
-        if (current?.subjectPost?.linkCard) open(current.subjectPost.linkCard.uri).catch(() => {})
+        if (current?.subjectPost?.linkCard && isSafeExternalUrl(current.subjectPost.linkCard.uri))
+          open(current.subjectPost.linkCard.uri).catch(() => {})
       }
       if (action === 'open-post') {
         const current = items[index]

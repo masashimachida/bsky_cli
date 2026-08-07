@@ -1,5 +1,6 @@
 import type { AtpClient } from './atp-client.js'
 import { toNotificationItem, toPostSummary, toTimelineItems } from './format.js'
+import { sanitizeText } from './sanitize.js'
 import type { FeedInfo, NotificationItem, PostSummary, TimelineItem } from './types.js'
 
 const GET_POSTS_CHUNK_SIZE = 25
@@ -61,11 +62,11 @@ export async function fetchSavedFeeds(client: AtpClient): Promise<FeedInfo[]> {
     return [
       {
         uri: generator.uri,
-        displayName: generator.displayName,
-        description: generator.description,
+        displayName: sanitizeText(generator.displayName),
+        description: generator.description ? sanitizeText(generator.description) : undefined,
         pinned: f.pinned,
         creatorHandle: generator.creator.handle,
-        creatorDisplayName: generator.creator.displayName,
+        creatorDisplayName: generator.creator.displayName ? sanitizeText(generator.creator.displayName) : undefined,
       },
     ]
   })

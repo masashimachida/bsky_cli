@@ -13,6 +13,7 @@ import {
   toggleRepost,
 } from '../api/client.js'
 import { postWebUrl } from '../api/format.js'
+import { isSafeExternalUrl } from '../api/sanitize.js'
 import { resolveListNavigation } from '../keymap/vim-list-keymap.js'
 import { resolveGlobalAction } from '../keymap/global-keymap.js'
 import { useTerminalRows } from '../navigation/useTerminalRows.js'
@@ -186,7 +187,7 @@ export function TimelineScreen({
       if (action === 'compose') onCompose()
       if (action === 'view-author') onOpenProfile(current.post.author.did)
       if (action === 'open-link') {
-        if (current.post.linkCard) open(current.post.linkCard.uri).catch(() => {})
+        if (current.post.linkCard && isSafeExternalUrl(current.post.linkCard.uri)) open(current.post.linkCard.uri).catch(() => {})
       }
       if (action === 'open-post') {
         open(postWebUrl(current.post)).catch(() => {})

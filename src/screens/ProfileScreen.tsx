@@ -7,6 +7,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog.js'
 import { ScrollingViewport, OVERHEAD_ROWS } from '../components/ScrollingViewport.js'
 import { dedupeTimelineItems, fetchAuthorFeed, toggleBlock, toggleFollow, toggleLike, toggleMute, toggleRepost } from '../api/client.js'
 import { postWebUrl } from '../api/format.js'
+import { isSafeExternalUrl, sanitizeText } from '../api/sanitize.js'
 import { resolveListNavigation } from '../keymap/vim-list-keymap.js'
 import { resolveGlobalAction } from '../keymap/global-keymap.js'
 import { useTerminalRows } from '../navigation/useTerminalRows.js'
@@ -107,8 +108,8 @@ export function ProfileScreen({
         setProfile({
           did: p.did,
           handle: p.handle,
-          displayName: p.displayName,
-          description: p.description,
+          displayName: p.displayName ? sanitizeText(p.displayName) : undefined,
+          description: p.description ? sanitizeText(p.description) : undefined,
           followersCount: p.followersCount,
           followsCount: p.followsCount,
           postsCount: p.postsCount,
@@ -217,7 +218,7 @@ export function ProfileScreen({
       if (action === 'open-thread') onOpenThread(current.post.uri)
       if (action === 'reply') onReply(current.post)
       if (action === 'open-link') {
-        if (current.post.linkCard) open(current.post.linkCard.uri).catch(() => {})
+        if (current.post.linkCard && isSafeExternalUrl(current.post.linkCard.uri)) open(current.post.linkCard.uri).catch(() => {})
       }
       if (action === 'open-post') {
         open(postWebUrl(current.post)).catch(() => {})

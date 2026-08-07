@@ -1,3 +1,4 @@
+import { sanitizeText } from './sanitize.js'
 import type { Author, ImageAttachment, LinkCard, NotificationItem, PostSummary, QuotedPost, TimelineItem } from './types.js'
 
 interface RawAuthor {
@@ -70,7 +71,7 @@ function extractQuotedPost(embed: RawEmbed): QuotedPost | undefined {
     return {
       status: 'available',
       author: toAuthor(recordResult.author),
-      text: recordResult.value.text,
+      text: sanitizeText(recordResult.value.text),
       createdAt: recordResult.value.createdAt,
     }
   }
@@ -105,7 +106,11 @@ function extractExternalEmbed(embed: RawEmbed): LinkCard | undefined {
         ? ((embed as RawRecordWithMediaEmbed).media as RawExternalEmbed).external
         : undefined
   if (!external) return undefined
-  return { uri: external.uri, title: external.title, description: truncateDescription(external.description) }
+  return {
+    uri: sanitizeText(external.uri),
+    title: sanitizeText(external.title),
+    description: sanitizeText(truncateDescription(external.description)),
+  }
 }
 
 interface RawPostView {
@@ -187,7 +192,7 @@ export function toAuthor(raw: RawAuthor): Author {
   return {
     did: raw.did,
     handle: raw.handle,
-    displayName: raw.displayName,
+    displayName: raw.displayName ? sanitizeText(raw.displayName) : undefined,
     avatarUrl: raw.avatar ? withJpegSuffix(raw.avatar) : undefined,
   }
 }
@@ -198,7 +203,7 @@ export function toPostSummary(post: RawPostView): PostSummary {
     ? imagesEmbed.images.map((img) => ({
         thumbUrl: withJpegSuffix(img.thumb),
         fullsizeUrl: withJpegSuffix(img.fullsize),
-        alt: img.alt,
+        alt: sanitizeText(img.alt),
         aspectRatio: img.aspectRatio,
       }))
     : []
@@ -207,7 +212,7 @@ export function toPostSummary(post: RawPostView): PostSummary {
     uri: post.uri,
     cid: post.cid,
     author: toAuthor(post.author),
-    text: post.record.text,
+    text: sanitizeText(post.record.text),
     createdAt: post.record.createdAt,
     images,
     hasVideo: post.embed?.$type === 'app.bsky.embed.video#view',
