@@ -14,7 +14,7 @@ interface RawPostRecord {
 
 interface RawImagesEmbed {
   $type: 'app.bsky.embed.images#view'
-  images: Array<{ thumb: string; fullsize: string; alt: string }>
+  images: Array<{ thumb: string; fullsize: string; alt: string; aspectRatio?: { width: number; height: number } }>
 }
 
 interface RawVideoEmbed {
@@ -199,6 +199,7 @@ export function toPostSummary(post: RawPostView): PostSummary {
         thumbUrl: withJpegSuffix(img.thumb),
         fullsizeUrl: withJpegSuffix(img.fullsize),
         alt: img.alt,
+        aspectRatio: img.aspectRatio,
       }))
     : []
 

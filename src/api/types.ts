@@ -9,6 +9,7 @@ export interface ImageAttachment {
   thumbUrl: string
   fullsizeUrl: string
   alt: string
+  aspectRatio?: { width: number; height: number }
 }
 
 export type QuotedPost =

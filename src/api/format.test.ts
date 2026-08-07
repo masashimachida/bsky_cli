@@ -95,6 +95,30 @@ describe('toPostSummary', () => {
     ])
   })
 
+  it('画像embedにaspectRatioがあればImageAttachmentに含める', () => {
+    const post = {
+      ...rawPostView,
+      embed: {
+        $type: 'app.bsky.embed.images#view',
+        images: [
+          {
+            thumb: 'https://cdn/thumb1.jpg',
+            fullsize: 'https://cdn/full1.jpg',
+            alt: '猫の写真',
+            aspectRatio: { width: 1600, height: 900 },
+          },
+        ],
+      },
+    } as never
+    const result = toPostSummary(post)
+    expect(result.images[0].aspectRatio).toEqual({ width: 1600, height: 900 })
+  })
+
+  it('画像embedにaspectRatioが無ければImageAttachmentのaspectRatioはundefined', () => {
+    const result = toPostSummary(rawPostView as never)
+    expect(result.images[0].aspectRatio).toBeUndefined()
+  })
+
   it('embedが無い投稿はimages空配列になる', () => {
     const noEmbed = { ...rawPostView, embed: undefined } as never
     expect(toPostSummary(noEmbed).images).toEqual([])
