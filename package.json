@@ -1,20 +1,39 @@
 {
   "name": "bskytui",
   "version": "0.0.1",
-  "description": "",
-  "main": "index.js",
+  "description": "A terminal UI client for Bluesky, built with Ink.",
+  "main": "dist/index.js",
   "directories": {
     "doc": "docs"
   },
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/masashimachida/bskytui.git"
+  },
+  "bugs": {
+    "url": "https://github.com/masashimachida/bskytui/issues"
+  },
+  "homepage": "https://github.com/masashimachida/bskytui#readme",
   "scripts": {
     "test": "vitest run",
     "build": "tsc -p tsconfig.json",
     "dev": "tsx src/index.tsx",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "prepublishOnly": "npm run build"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "bluesky",
+    "atproto",
+    "cli",
+    "tui",
+    "terminal",
+    "ink"
+  ],
+  "author": "mmachida",
+  "license": "MIT",
   "type": "module",
   "dependencies": {
     "@atproto/api": "^0.20.36",
