@@ -63,6 +63,10 @@ export function ThreadScreen({
   onBack,
   onOpenProfile,
   onQuote,
+  onSwitchTimeline,
+  onSwitchNotifications,
+  onSwitchFeeds,
+  onSwitchProfile,
 }: {
   client: AtpClient
   uri: string
@@ -74,6 +78,10 @@ export function ThreadScreen({
   onBack: () => void
   onOpenProfile: (actor: string) => void
   onQuote: (post: PostSummary) => void
+  onSwitchTimeline: () => void
+  onSwitchNotifications: () => void
+  onSwitchFeeds: () => void
+  onSwitchProfile: () => void
 }) {
   const [posts, setPosts] = useState<PostSummary[]>(initialPosts)
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
@@ -84,6 +92,27 @@ export function ThreadScreen({
   const [loading, setLoading] = useState(initialPosts.length === 0)
   const [error, setError] = useState<string>()
   const expandTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // 画像が展開されたまま画面遷移すると、直接stdout書き込みで描画された画像がInkの
+  // 通常描画パイプラインとのタイミング競合で消えずに残ってしまう(ink-pictureの
+  // useDirectRenderer方式の既知の制約)。画像を閉じるレンダーを1回挟んでから遷移
+  // コールバックを呼ぶことで、画像コンポーネントのアンマウント処理を画面遷移より
+  // 先に完了させる。
+  const pendingActionRef = useRef<(() => void) | null>(null)
+  useEffect(() => {
+    if (pendingActionRef.current && !isExpanded) {
+      const fn = pendingActionRef.current
+      pendingActionRef.current = null
+      fn()
+    }
+  }, [isExpanded])
+  function runAfterCollapse(fn: () => void) {
+    if (isExpanded) {
+      pendingActionRef.current = fn
+      setExpandedIndex(null)
+    } else {
+      fn()
+    }
+  }
 
   useEffect(() => {
     if (initialPosts.length > 0) {
@@ -150,7 +179,7 @@ export function ThreadScreen({
   useInput(
     (input, key) => {
       if (key.escape || input === 'h') {
-        onBack()
+        runAfterCollapse(onBack)
         return
       }
       if (error && posts.length === 0) {
@@ -176,9 +205,26 @@ export function ThreadScreen({
         return
       }
 
+      const action = resolveGlobalAction(input, key)
+      if (action === 'switch-timeline') {
+        runAfterCollapse(onSwitchTimeline)
+        return
+      }
+      if (action === 'switch-notifications') {
+        runAfterCollapse(onSwitchNotifications)
+        return
+      }
+      if (action === 'switch-feeds') {
+        runAfterCollapse(onSwitchFeeds)
+        return
+      }
+      if (action === 'switch-profile') {
+        runAfterCollapse(onSwitchProfile)
+        return
+      }
+
       const current = posts[index]
       if (!current) return
-      const action = resolveGlobalAction(input, key)
       if (action === 'reply') onReply(current, posts[0] ?? current)
       if (action === 'view-author') onOpenProfile(current.author.did)
       if (action === 'open-link') {

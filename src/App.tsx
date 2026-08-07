@@ -204,6 +204,16 @@ export function App() {
     pop()
   }
 
+  function switchToProfile() {
+    if (top.name === 'profile' && top.actor === client?.did) return
+    openProfile()
+  }
+
+  // ThreadScreenは画像展開機能を持ち、画像が展開されたまま画面遷移すると
+  // ink-pictureの直接stdout書き込み方式のクリーンアップがInkの通常描画パイプラインと
+  // 競合し描画が残ってしまうため、ThreadScreen内で画像を閉じてから遷移する制御を行う。
+  // そのためThreadScreen表示中はswitch-*をここで処理せず、ThreadScreen側のローカル
+  // ハンドラに委ねる(TimelineScreen/FeedScreenは画像展開機能を持たないため対象外)。
   useInput(
     (input, key) => {
       const action = resolveGlobalAction(input, key)
@@ -220,11 +230,10 @@ export function App() {
         return
       }
       if (action === 'switch-profile') {
-        if (top.name === 'profile' && top.actor === client?.did) return
-        openProfile()
+        switchToProfile()
       }
     },
-    { isActive: !showHelp && top.name !== 'login' && top.name !== 'compose' },
+    { isActive: !showHelp && top.name !== 'login' && top.name !== 'compose' && top.name !== 'thread' },
   )
 
   return (
@@ -283,6 +292,10 @@ export function App() {
                 onBack={pop}
                 onOpenProfile={openProfile}
                 onQuote={openQuoteCompose}
+                onSwitchTimeline={switchToTimeline}
+                onSwitchNotifications={switchToNotifications}
+                onSwitchFeeds={switchToFeedList}
+                onSwitchProfile={switchToProfile}
               />
             )}
             {client && top.name === 'compose' && (
