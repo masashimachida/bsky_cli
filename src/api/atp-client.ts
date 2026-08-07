@@ -47,6 +47,22 @@ export interface AtpClient {
   updateSeenNotifications(seenAt?: string): Promise<void>
   countUnreadNotifications(): Promise<{ data: { count: number } }>
   getPreferences(): Promise<{ savedFeeds: AtpSavedFeed[] }>
+  follow(subjectDid: string): Promise<{ uri: string; cid: string }>
+  deleteFollow(followUri: string): Promise<void>
+  mute(actor: string): Promise<void>
+  unmute(actor: string): Promise<void>
+  com: {
+    atproto: {
+      repo: {
+        createRecord(params: {
+          repo: string
+          collection: string
+          record: { $type: string; [key: string]: unknown }
+        }): Promise<{ data: { uri: string; cid: string } }>
+        deleteRecord(params: { repo: string; collection: string; rkey: string }): Promise<unknown>
+      }
+    }
+  }
   app: {
     bsky: {
       feed: {

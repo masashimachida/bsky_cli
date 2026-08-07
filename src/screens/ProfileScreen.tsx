@@ -6,7 +6,7 @@ import { PostItem } from '../components/PostItem.js'
 import { StatusBar } from '../components/StatusBar.js'
 import { ConfirmDialog } from '../components/ConfirmDialog.js'
 import { ScrollingViewport, OVERHEAD_ROWS } from '../components/ScrollingViewport.js'
-import { dedupeTimelineItems, fetchAuthorFeed, toggleLike, toggleRepost } from '../api/client.js'
+import { dedupeTimelineItems, fetchAuthorFeed, toggleBlock, toggleFollow, toggleLike, toggleMute, toggleRepost } from '../api/client.js'
 import { postWebUrl } from '../api/format.js'
 import { resolveListNavigation } from '../keymap/vim-list-keymap.js'
 import { resolveGlobalAction } from '../keymap/global-keymap.js'
@@ -16,12 +16,42 @@ import type { AtpClient } from '../api/atp-client.js'
 import type { PostSummary, TimelineItem } from '../api/types.js'
 
 interface ProfileData {
+  did: string
   handle: string
   displayName?: string
   description?: string
   followersCount?: number
   followsCount?: number
   postsCount?: number
+  viewerFollowingUri?: string
+  viewerMuted?: boolean
+  viewerBlockingUri?: string
+}
+
+type ProfileAction =
+  | { type: 'follow' }
+  | { type: 'unfollow' }
+  | { type: 'mute' }
+  | { type: 'unmute' }
+  | { type: 'block' }
+  | { type: 'unblock' }
+
+const PROFILE_ACTION_MESSAGES: Record<ProfileAction['type'], string> = {
+  follow: 'このユーザーをフォローしますか?',
+  unfollow: 'フォローを解除しますか?',
+  mute: 'このユーザーをミュートしますか?',
+  unmute: 'ミュートを解除しますか?',
+  block: 'このユーザーをブロックしますか?',
+  unblock: 'ブロックを解除しますか?',
+}
+
+const PROFILE_ACTION_CONFIRM_LABELS: Record<ProfileAction['type'], string> = {
+  follow: 'y: フォロー',
+  unfollow: 'y: フォロー解除',
+  mute: 'y: ミュート',
+  unmute: 'y: ミュート解除',
+  block: 'y: ブロック',
+  unblock: 'y: ブロック解除',
 }
 
 export function ProfileScreen({
@@ -60,6 +90,7 @@ export function ProfileScreen({
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const isLoadingMoreRef = useRef(false)
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
+  const [profileAction, setProfileAction] = useState<ProfileAction | null>(null)
   // dedupeTimelineItemsのseenUrisをページをまたいで永続化する(TimelineScreenと同じ理由)。
   const seenUrisRef = useRef<Set<string>>(new Set(initialItems.map((it) => it.post.uri)))
 
@@ -71,12 +102,16 @@ export function ProfileScreen({
         if (cancelled) return
         const p = res.data
         setProfile({
+          did: p.did,
           handle: p.handle,
           displayName: p.displayName,
           description: p.description,
           followersCount: p.followersCount,
           followsCount: p.followsCount,
           postsCount: p.postsCount,
+          viewerFollowingUri: p.viewer?.following,
+          viewerMuted: p.viewer?.muted,
+          viewerBlockingUri: p.viewer?.blocking,
         })
       })
       .catch(() => {
@@ -134,6 +169,21 @@ export function ProfileScreen({
         return
       }
 
+      if (profile && profile.did !== client.did) {
+        if (input === 'F') {
+          setProfileAction(profile.viewerFollowingUri ? { type: 'unfollow' } : { type: 'follow' })
+          return
+        }
+        if (input === 'M') {
+          setProfileAction(profile.viewerMuted ? { type: 'unmute' } : { type: 'mute' })
+          return
+        }
+        if (input === 'B') {
+          setProfileAction(profile.viewerBlockingUri ? { type: 'unblock' } : { type: 'block' })
+          return
+        }
+      }
+
       const nav = resolveListNavigation(input, key)
       if (nav === 'down') {
         setIndex((i) => {
@@ -179,7 +229,7 @@ export function ProfileScreen({
         onQuote(current.post)
       }
     },
-    { isActive: active && !confirmAction },
+    { isActive: active && !confirmAction && !profileAction },
   )
 
   useInput(
@@ -205,6 +255,45 @@ export function ProfileScreen({
       }
     },
     { isActive: active && !!confirmAction },
+  )
+
+  useInput(
+    (input, key) => {
+      if (input === 'y') {
+        const action = profileAction
+        if (!action || !profile) return
+        setProfileAction(null)
+        if (action.type === 'follow' || action.type === 'unfollow') {
+          toggleFollow(client, profile.did, profile.viewerFollowingUri)
+            .then((patch) => {
+              setProfile((prev) => (prev ? { ...prev, viewerFollowingUri: patch.followingUri } : prev))
+              setFeedError(undefined)
+            })
+            .catch(() => setFeedError('フォロー操作に失敗しました'))
+        }
+        if (action.type === 'mute' || action.type === 'unmute') {
+          toggleMute(client, profile.did, !!profile.viewerMuted)
+            .then((patch) => {
+              setProfile((prev) => (prev ? { ...prev, viewerMuted: patch.muted } : prev))
+              setFeedError(undefined)
+            })
+            .catch(() => setFeedError('ミュート操作に失敗しました'))
+        }
+        if (action.type === 'block' || action.type === 'unblock') {
+          toggleBlock(client, profile.did, profile.viewerBlockingUri)
+            .then((patch) => {
+              setProfile((prev) => (prev ? { ...prev, viewerBlockingUri: patch.blockingUri } : prev))
+              setFeedError(undefined)
+            })
+            .catch(() => setFeedError('ブロック操作に失敗しました'))
+        }
+        return
+      }
+      if (input === 'n' || key.escape) {
+        setProfileAction(null)
+      }
+    },
+    { isActive: active && !!profileAction },
   )
 
   const rows = useTerminalRows()
@@ -257,6 +346,13 @@ export function ProfileScreen({
           <Text>フォロワー {profile.followersCount ?? 0}</Text>
           <Text>投稿 {profile.postsCount ?? 0}</Text>
         </Box>
+        {(profile.viewerFollowingUri || profile.viewerMuted || profile.viewerBlockingUri) && (
+          <Box gap={2}>
+            {profile.viewerFollowingUri && <Text color="green">フォロー中</Text>}
+            {profile.viewerMuted && <Text color="yellow">ミュート中</Text>}
+            {profile.viewerBlockingUri && <Text color="red">ブロック中</Text>}
+          </Box>
+        )}
       </Box>
       {!feedLoading && (
         <ScrollingViewport
@@ -285,6 +381,12 @@ export function ProfileScreen({
         <ConfirmDialog
           message="この投稿をリポストしますか?"
           confirmLabel={confirmAction.post.viewerRepostUri ? 'y: リポスト解除' : 'y: リポスト'}
+        />
+      )}
+      {profileAction && (
+        <ConfirmDialog
+          message={PROFILE_ACTION_MESSAGES[profileAction.type]}
+          confirmLabel={PROFILE_ACTION_CONFIRM_LABELS[profileAction.type]}
         />
       )}
     </Box>

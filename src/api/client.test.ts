@@ -10,6 +10,9 @@ import {
   createPost,
   toggleLike,
   toggleRepost,
+  toggleFollow,
+  toggleMute,
+  toggleBlock,
   deletePost,
   dedupeTimelineItems,
   mergeNewTimelineItems,
@@ -47,6 +50,18 @@ function fakeClient(overrides: Partial<AtpClient> = {}): AtpClient {
     updateSeenNotifications: vi.fn(async () => undefined),
     countUnreadNotifications: vi.fn(async () => ({ data: { count: 0 } })) as never,
     getPreferences: vi.fn(async () => ({ savedFeeds: [] })) as never,
+    follow: vi.fn(async () => ({ uri: 'at://follow/1', cid: 'fc1' })),
+    deleteFollow: vi.fn(async () => undefined),
+    mute: vi.fn(async () => undefined),
+    unmute: vi.fn(async () => undefined),
+    com: {
+      atproto: {
+        repo: {
+          createRecord: vi.fn(async () => ({ success: true, headers: {}, data: { uri: 'at://block/1', cid: 'bc1' } })) as never,
+          deleteRecord: vi.fn(async () => ({ success: true, headers: {}, data: {} })) as never,
+        },
+      },
+    },
     app: {
       bsky: {
         feed: {
@@ -375,6 +390,64 @@ describe('deletePost', () => {
     const client = fakeClient()
     await deletePost(client, likedPost)
     expect(client.deletePost).toHaveBeenCalledWith('at://p/1')
+  })
+})
+
+describe('toggleFollow', () => {
+  it('未フォローならfollowしてfollowingUriを返す', async () => {
+    const client = fakeClient()
+    const result = await toggleFollow(client, 'did:plc:target', undefined)
+    expect(client.follow).toHaveBeenCalledWith('did:plc:target')
+    expect(result).toEqual({ followingUri: 'at://follow/1' })
+  })
+
+  it('フォロー中ならdeleteFollowしてfollowingUriをundefinedにする', async () => {
+    const client = fakeClient()
+    const result = await toggleFollow(client, 'did:plc:target', 'at://follow/existing')
+    expect(client.deleteFollow).toHaveBeenCalledWith('at://follow/existing')
+    expect(result).toEqual({ followingUri: undefined })
+  })
+})
+
+describe('toggleMute', () => {
+  it('未ミュートならmuteしてmuted:trueを返す', async () => {
+    const client = fakeClient()
+    const result = await toggleMute(client, 'did:plc:target', false)
+    expect(client.mute).toHaveBeenCalledWith('did:plc:target')
+    expect(result).toEqual({ muted: true })
+  })
+
+  it('ミュート中ならunmuteしてmuted:falseを返す', async () => {
+    const client = fakeClient()
+    const result = await toggleMute(client, 'did:plc:target', true)
+    expect(client.unmute).toHaveBeenCalledWith('did:plc:target')
+    expect(result).toEqual({ muted: false })
+  })
+})
+
+describe('toggleBlock', () => {
+  it('未ブロックならapp.bsky.graph.blockレコードを作成しblockingUriを返す', async () => {
+    const client = fakeClient({ did: 'did:plc:me' })
+    const result = await toggleBlock(client, 'did:plc:target', undefined)
+    expect(client.com.atproto.repo.createRecord).toHaveBeenCalledWith(
+      expect.objectContaining({
+        repo: 'did:plc:me',
+        collection: 'app.bsky.graph.block',
+        record: expect.objectContaining({ $type: 'app.bsky.graph.block', subject: 'did:plc:target' }),
+      }),
+    )
+    expect(result).toEqual({ blockingUri: 'at://block/1' })
+  })
+
+  it('ブロック中ならblockUriのrkeyでdeleteRecordしblockingUriをundefinedにする', async () => {
+    const client = fakeClient({ did: 'did:plc:me' })
+    const result = await toggleBlock(client, 'did:plc:target', 'at://did:plc:me/app.bsky.graph.block/abc123')
+    expect(client.com.atproto.repo.deleteRecord).toHaveBeenCalledWith({
+      repo: 'did:plc:me',
+      collection: 'app.bsky.graph.block',
+      rkey: 'abc123',
+    })
+    expect(result).toEqual({ blockingUri: undefined })
   })
 })
 

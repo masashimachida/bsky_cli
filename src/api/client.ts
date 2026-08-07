@@ -250,3 +250,45 @@ export async function toggleRepost(
 export async function deletePost(client: AtpClient, post: PostSummary): Promise<void> {
   await client.deletePost(post.uri)
 }
+
+export async function toggleFollow(
+  client: AtpClient,
+  targetDid: string,
+  followingUri: string | undefined,
+): Promise<{ followingUri?: string }> {
+  if (followingUri) {
+    await client.deleteFollow(followingUri)
+    return { followingUri: undefined }
+  }
+  const { uri } = await client.follow(targetDid)
+  return { followingUri: uri }
+}
+
+export async function toggleMute(client: AtpClient, targetDid: string, muted: boolean): Promise<{ muted: boolean }> {
+  if (muted) {
+    await client.unmute(targetDid)
+    return { muted: false }
+  }
+  await client.mute(targetDid)
+  return { muted: true }
+}
+
+const BLOCK_COLLECTION = 'app.bsky.graph.block'
+
+export async function toggleBlock(
+  client: AtpClient,
+  targetDid: string,
+  blockingUri: string | undefined,
+): Promise<{ blockingUri?: string }> {
+  if (blockingUri) {
+    const rkey = blockingUri.split('/').pop()!
+    await client.com.atproto.repo.deleteRecord({ repo: client.did!, collection: BLOCK_COLLECTION, rkey })
+    return { blockingUri: undefined }
+  }
+  const { data } = await client.com.atproto.repo.createRecord({
+    repo: client.did!,
+    collection: BLOCK_COLLECTION,
+    record: { $type: BLOCK_COLLECTION, subject: targetDid, createdAt: new Date().toISOString() },
+  })
+  return { blockingUri: data.uri }
+}
