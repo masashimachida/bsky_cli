@@ -1,5 +1,5 @@
 {
-  "name": "bsky_cli",
+  "name": "bskytui",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -35,7 +35,7 @@
     "vitest": "^4.1.10"
   },
   "bin": {
-    "bsky-cli": "dist/index.js"
+    "bskytui": "dist/index.js"
   },
   "engines": {
     "node": ">=18"

@@ -43,7 +43,7 @@ export function LoginScreen({
 
   return (
     <Box flexDirection="column" borderStyle="round" padding={1}>
-      <Text bold>bsky-cli ログイン</Text>
+      <Text bold>bskytui ログイン</Text>
       <Text dimColor>Handle（例: user.bsky.social）と App Password（bsky.app設定画面で発行）を入力</Text>
       <Box marginTop={1}>
         <Text>Handle: </Text>

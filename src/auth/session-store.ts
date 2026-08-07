@@ -1,7 +1,7 @@
 import { Entry } from '@napi-rs/keyring'
 import type { AtpSessionData } from '@atproto/api'
 
-const SERVICE = 'bsky-cli'
+const SERVICE = 'bskytui'
 const ACCOUNT = 'session'
 
 export interface KeyringEntry {

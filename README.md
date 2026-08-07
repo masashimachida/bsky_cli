@@ -1,4 +1,6 @@
-# bluesky cli client
+# bskytui
+
+A terminal UI client for Bluesky, built with Ink.
 
 **usage**
 
